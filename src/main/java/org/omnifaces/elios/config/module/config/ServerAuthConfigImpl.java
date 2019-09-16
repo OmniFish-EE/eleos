@@ -18,20 +18,19 @@ package org.omnifaces.elios.config.module.config;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
+
 import javax.security.auth.Subject;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.AuthStatus;
-import javax.security.auth.message.MessageInfo;
-import javax.security.auth.message.MessagePolicy;
 import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.module.ServerAuthModule;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
-import org.omnifaces.elios.config.helper.ModulesManager;
 import org.omnifaces.elios.config.helper.EpochCarrier;
+import org.omnifaces.elios.config.helper.ModulesManager;
+import org.omnifaces.elios.config.module.context.ServerAuthContextImpl;
 
 /**
  *
@@ -69,92 +68,7 @@ public class ServerAuthConfigImpl extends BaseAuthConfigImpl implements ServerAu
 
         // need to coordinate calls to CallerPrincipalCallback; expecially optional
         // modules that might reset the result of a required module
-        return new ServerAuthContext() {
-
-            ServerAuthModule[] module = init();
-
-            ServerAuthModule[] init() throws AuthException {
-                ServerAuthModule[] m;
-                try {
-                    m = acHelper.getModules(new ServerAuthModule[0], authContextID);
-                } catch (AuthException ae) {
-                    logIfLevel(Level.SEVERE, ae, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(),
-                            "unable to load server auth modules");
-                    throw ae;
-                }
-
-                MessagePolicy requestPolicy = mpDelegate.getRequestPolicy(authContextID, properties);
-                MessagePolicy responsePolicy = mpDelegate.getResponsePolicy(authContextID, properties);
-
-                boolean noModules = true;
-                for (int i = 0; i < m.length; i++) {
-                    if (m[i] != null) {
-                        if (isLoggable(Level.FINE)) {
-                            logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "initializing module");
-                        }
-                        noModules = false;
-                        checkMessageTypes(m[i].getSupportedMessageTypes());
-                        m[i].initialize(requestPolicy, responsePolicy, cbh, acHelper.getInitProperties(i, properties));
-                    }
-                }
-                if (noModules) {
-                    logIfLevel(Level.WARNING, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "contains no Auth Modules");
-                }
-                return m;
-            }
-
-            @Override
-            public AuthStatus validateRequest(MessageInfo arg0, Subject arg1, Subject arg2) throws AuthException {
-                AuthStatus[] status = new AuthStatus[module.length];
-                for (int i = 0; i < module.length; i++) {
-                    if (module[i] == null) {
-                        continue;
-                    }
-                    if (isLoggable(Level.FINE)) {
-                        logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(),
-                                "calling vaidateRequest on module");
-                    }
-                    status[i] = module[i].validateRequest(arg0, arg1, arg2);
-                    if (acHelper.exitContext(vR_SuccessValue, i, status[i])) {
-                        return acHelper.getReturnStatus(vR_SuccessValue, AuthStatus.SEND_FAILURE, status, i);
-                    }
-                }
-                return acHelper.getReturnStatus(vR_SuccessValue, AuthStatus.SEND_FAILURE, status, status.length - 1);
-            }
-
-            @Override
-            public AuthStatus secureResponse(MessageInfo arg0, Subject arg1) throws AuthException {
-                AuthStatus[] status = new AuthStatus[module.length];
-                for (int i = 0; i < module.length; i++) {
-                    if (module[i] == null) {
-                        continue;
-                    }
-                    if (isLoggable(Level.FINE)) {
-                        logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(),
-                                "calling secureResponse on module");
-                    }
-                    status[i] = module[i].secureResponse(arg0, arg1);
-                    if (acHelper.exitContext(sR_SuccessValue, i, status[i])) {
-                        return acHelper.getReturnStatus(sR_SuccessValue, AuthStatus.SEND_FAILURE, status, i);
-                    }
-                }
-                return acHelper.getReturnStatus(sR_SuccessValue, AuthStatus.SEND_FAILURE, status, status.length - 1);
-            }
-
-            @Override
-            public void cleanSubject(MessageInfo arg0, Subject arg1) throws AuthException {
-                for (int i = 0; i < module.length; i++) {
-                    if (module[i] == null) {
-                        continue;
-                    }
-                    if (isLoggable(Level.FINE)) {
-                        logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(),
-                                "calling cleanSubject on module");
-                    }
-                    module[i].cleanSubject(arg0, arg1);
-                }
-            }
-        };
+        return new ServerAuthContextImpl(properties);
     }
 
     @Override

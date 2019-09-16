@@ -27,7 +27,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
 import org.omnifaces.elios.config.helper.ModulesManager;
-import org.omnifaces.elios.config.jaas.JAASAuthConfigProvider;
+import org.omnifaces.elios.config.module.configprovider.JAASAuthConfigProvider;
 
 /**
  *

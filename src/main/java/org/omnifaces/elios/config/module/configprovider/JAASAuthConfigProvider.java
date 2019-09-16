@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  */
 
-package org.omnifaces.elios.config.jaas;
+package org.omnifaces.elios.config.module.configprovider;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -24,8 +24,9 @@ import javax.security.auth.message.AuthException;
 import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
+import org.omnifaces.elios.config.helper.JAASModulesManager;
 import org.omnifaces.elios.config.helper.ModulesManager;
-import org.omnifaces.elios.config.module.configprovider.BaseAuthConfigProvider;
+import org.omnifaces.elios.config.jaas.ExtendedConfigFile;
 
 /**
  *
@@ -121,7 +122,7 @@ public abstract class JAASAuthConfigProvider extends BaseAuthConfigProvider {
 
     @Override
     public ModulesManager getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
-        return new JAASAuthContextHelper(getLoggerName(), returnNullContexts, jaasConfig, properties, appContext);
+        return new JAASModulesManager(getLoggerName(), returnNullContexts, jaasConfig, properties, appContext);
     }
 
     @Override
