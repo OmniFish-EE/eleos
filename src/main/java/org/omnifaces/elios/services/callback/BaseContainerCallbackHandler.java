@@ -221,7 +221,7 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
         final Principal callerPrincipal = sc != null ? sc.getCallerPrincipal() : null;
         final Principal defaultPrincipal = SecurityContext.getDefaultCallerPrincipal();
 
-        return ((Boolean) AppservAccessController.doPrivileged(new PrivilegedAction() {
+        return ((Boolean) PriviledgedAccessController.doPrivileged(new PrivilegedAction() {
 
             /**
              * this method uses 4 (numbered) criteria to determine if the argument WebPrincipal can be reused
@@ -366,7 +366,7 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
 
         final Principal fprin = principal;
         final DistinguishedPrincipalCredential fdpc = new DistinguishedPrincipalCredential(principal);
-        AppservAccessController.doPrivileged(new PrivilegedAction() {
+        PriviledgedAccessController.doPrivileged(new PrivilegedAction() {
             public java.lang.Object run() {
                 fs.getPrincipals().add(fprin);
                 Iterator iter = fs.getPublicCredentials().iterator();
@@ -386,7 +386,7 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
         final Subject fs = gpCallback.getSubject();
         final String[] groups = gpCallback.getGroups();
         if (groups != null && groups.length > 0) {
-            AppservAccessController.doPrivileged(new PrivilegedAction() {
+            PriviledgedAccessController.doPrivileged(new PrivilegedAction() {
                 public java.lang.Object run() {
                     for (String group : groups) {
                         fs.getPrincipals().add(new Group(group));
@@ -395,7 +395,7 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
                 }
             });
         } else if (groups == null) {
-            AppservAccessController.doPrivileged(new PrivilegedAction() {
+            PriviledgedAccessController.doPrivileged(new PrivilegedAction() {
                 public java.lang.Object run() {
                     Set<Principal> principalSet = fs.getPrincipals();
                     principalSet.removeAll(fs.getPrincipals(Group.class));

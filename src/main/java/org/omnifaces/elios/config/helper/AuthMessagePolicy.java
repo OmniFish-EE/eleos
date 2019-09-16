@@ -120,7 +120,7 @@ public class AuthMessagePolicy {
     public static CallbackHandler getDefaultCallbackHandler() {
         // get the default handler class
         try {
-            CallbackHandler rvalue = (CallbackHandler) AppservAccessController.doPrivileged(new PrivilegedExceptionAction() {
+            CallbackHandler rvalue = (CallbackHandler) PriviledgedAccessController.doPrivileged(new PrivilegedExceptionAction() {
                 public Object run() throws Exception {
                     ClassLoader loader = Thread.currentThread().getContextClassLoader();
                     if (handlerClassName == null) {
