@@ -46,8 +46,8 @@ import javax.security.auth.message.config.ServerAuthContext;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.omnifaces.elios.config.factory.AuthConfigFileFactory;
 import org.omnifaces.elios.config.factory.BaseAuthConfigFactory;
+import org.omnifaces.elios.config.factory.file.AuthConfigFileFactory;
 import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
 import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
 
