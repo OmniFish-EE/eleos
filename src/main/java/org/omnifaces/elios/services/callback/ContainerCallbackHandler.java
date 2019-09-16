@@ -31,7 +31,7 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import org.glassfish.internal.api.Globals;
 import org.jvnet.hk2.annotations.ContractsProvided;
 import org.jvnet.hk2.annotations.Service;
-import org.omnifaces.elios.config.helper.BaseContainerCallbackHandler;
+import org.omnifaces.elios.config.helper.BaseCallbackHandler;
 import org.omnifaces.elios.config.helper.ServerCallbackHandler;
 import org.omnifaces.elios.services.config.CallbackHandlerConfig;
 import org.omnifaces.elios.services.config.HandlerContext;
@@ -69,7 +69,7 @@ public final class ContainerCallbackHandler implements CallbackHandler, Callback
                 return fRealmName;
             }
         };
-        ((BaseContainerCallbackHandler) handler).setHandlerContext(handlerContext);
+        ((BaseCallbackHandler) handler).setHandlerContext(handlerContext);
     }
 
     /*

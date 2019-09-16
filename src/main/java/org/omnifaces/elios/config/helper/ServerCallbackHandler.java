@@ -41,7 +41,7 @@ import javax.security.auth.message.callback.TrustStoreCallback;
  * @author Harpreet Singh
  * @author Shing Wai Chan
  */
-final class ServerCallbackHandler extends BaseContainerCallbackHandler {
+final class ServerCallbackHandler extends BaseCallbackHandler {
 
     ServerCallbackHandler() {
     }
