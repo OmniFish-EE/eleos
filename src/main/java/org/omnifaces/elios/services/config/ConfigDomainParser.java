@@ -29,7 +29,7 @@ import javax.security.auth.message.MessagePolicy;
 
 import org.jvnet.hk2.config.types.Property;
 import org.omnifaces.elios.config.factory.ConfigParser;
-import org.omnifaces.elios.services.AuthMessagePolicy;
+import org.omnifaces.elios.config.helper.AuthMessagePolicy;
 import org.omnifaces.enterprise.config.serverbeans.MessageSecurityConfig;
 import org.omnifaces.enterprise.config.serverbeans.ProviderConfig;
 import org.omnifaces.enterprise.config.serverbeans.RequestPolicy;

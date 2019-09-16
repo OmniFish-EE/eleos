@@ -29,7 +29,7 @@ import org.omnifaces.elios.services.config.GFServerConfigProvider;
  * 
  * @author Shing Wai Chan
  */
-public class GFAuthConfigFactory extends BaseAuthConfigFactory {
+public class DefaultConfigFactory extends BaseAuthConfigFactory {
 
     // MUST "hide" regStore in derived class.
     static RegStoreFileParser regStore = null;
@@ -46,7 +46,7 @@ public class GFAuthConfigFactory extends BaseAuthConfigFactory {
      * EntryInfo(String className, Map<String, String> properties);
      *
      */
-    public GFAuthConfigFactory() {
+    public DefaultConfigFactory() {
         rLock.lock();
         try {
             if (regStore != null) {

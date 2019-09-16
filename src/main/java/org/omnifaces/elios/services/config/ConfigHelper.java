@@ -38,7 +38,7 @@ import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.glassfish.internal.api.Globals;
-import org.omnifaces.elios.services.AuthMessagePolicy;
+import org.omnifaces.elios.config.helper.AuthMessagePolicy;
 import org.omnifaces.elios.services.WebServicesDelegate;
 
 /**
