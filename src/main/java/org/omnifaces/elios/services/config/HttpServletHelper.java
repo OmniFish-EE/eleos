@@ -23,13 +23,14 @@ import javax.security.auth.message.config.AuthConfigProvider;
 
 import org.omnifaces.elios.config.helper.HttpServletConstants;
 import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
+import org.omnifaces.elios.services.BaseAuthenticationService;
 import org.omnifaces.enterprise.deployment.WebBundleDescriptor;
 import org.omnifaces.enterprise.deployment.runtime.web.SunWebApp;
 import org.omnifaces.enterprise.deployment.web.LoginConfiguration;
 import org.omnifaces.enterprise.security.auth.realm.certificate.CertificateRealm;
 import org.omnifaces.enterprise.security.web.integration.WebSecurityManager;
 
-public class HttpServletHelper extends ConfigHelper {
+public class HttpServletHelper extends BaseAuthenticationService {
     private String realmName = null;
 
     public static final String AUTH_TYPE = "javax.servlet.http.authType";

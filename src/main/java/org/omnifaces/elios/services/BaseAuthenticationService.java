@@ -14,14 +14,12 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  */
 
-package org.omnifaces.elios.services.config;
+package org.omnifaces.elios.services;
 
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.CallbackHandler;
@@ -29,22 +27,22 @@ import javax.security.auth.message.AuthException;
 import javax.security.auth.message.MessageInfo;
 import javax.security.auth.message.config.AuthConfig;
 import javax.security.auth.message.config.AuthConfigFactory;
+import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 import javax.security.auth.message.config.AuthConfigProvider;
 import javax.security.auth.message.config.ClientAuthConfig;
 import javax.security.auth.message.config.ClientAuthContext;
 import javax.security.auth.message.config.RegistrationListener;
 import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
-import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
-import org.glassfish.internal.api.Globals;
 import org.omnifaces.elios.config.helper.AuthMessagePolicy;
-import org.omnifaces.elios.services.WebServicesDelegate;
+import org.omnifaces.elios.services.config.CallbackHandlerConfig;
+import org.omnifaces.elios.services.config.HandlerContext;
 
 /**
  * This is based Helper class for 196 Configuration. This class implements RegistrationListener.
  */
-public abstract class ConfigHelper /* implements RegistrationListener */ {
+public abstract class BaseAuthenticationService {
     private static final String DEFAULT_HANDLER_CLASS = "com.sun.enterprise.security.jmac.callback.ContainerCallbackHandler";
 
 //    private static String handlerClassName = null;
@@ -229,178 +227,6 @@ public abstract class ConfigHelper /* implements RegistrationListener */ {
         return null;
     }
 
-    private static class ConfigData {
-
-        private AuthConfigProvider provider;
-        private AuthConfig sConfig;
-        private AuthConfig cConfig;
-
-        ConfigData() {
-            provider = null;
-            sConfig = null;
-            cConfig = null;
-        }
-
-        ConfigData(AuthConfigProvider p, AuthConfig a) {
-            provider = p;
-            if (a == null) {
-                sConfig = null;
-                cConfig = null;
-            } else if (a instanceof ServerAuthConfig) {
-                sConfig = a;
-                cConfig = null;
-            } else if (a instanceof ClientAuthConfig) {
-                sConfig = null;
-                cConfig = a;
-            } else {
-                throw new IllegalArgumentException();
-            }
-        }
-    }
-
-    // Adding extra inner class because specializing the Linstener Impl class would
-    // make the GF 196 implementation Non-Replaceable.
-    // This class would hold a RegistrationListener within.
-    public static class AuthConfigRegistrationWrapper {
-
-        private String layer;
-        private String appCtxt;
-        private String jmacProviderRegisID = null;
-        private boolean enabled;
-        private ConfigData data;
-
-        private Lock wLock;
-        private ReadWriteLock rwLock;
-
-        AuthConfigRegistrationListener listener;
-        int referenceCount = 1;
-        private WebServicesDelegate delegate = null;
-
-        public AuthConfigRegistrationWrapper(String layer, String appCtxt) {
-            this.layer = layer;
-            this.appCtxt = appCtxt;
-            this.rwLock = new ReentrantReadWriteLock(true);
-            this.wLock = rwLock.writeLock();
-            enabled = (factory != null);
-            listener = new AuthConfigRegistrationListener(layer, appCtxt);
-            if (Globals.getDefaultHabitat() != null) {
-                delegate = Globals.get(WebServicesDelegate.class);
-            } else {
-                try {
-                    // for non HK2 environments
-                    // try to get WebServicesDelegateImpl by reflection.
-                    ClassLoader loader = Thread.currentThread().getContextClassLoader();
-                    Class delegateClass = loader.loadClass("com.sun.enterprise.security.webservices.WebServicesDelegateImpl");
-                    delegate = (WebServicesDelegate) delegateClass.newInstance();
-                } catch (InstantiationException ex) {
-                } catch (IllegalAccessException ex) {
-                } catch (ClassNotFoundException ex) {
-                }
-            }
-        }
-
-        public AuthConfigRegistrationListener getListener() {
-            return listener;
-        }
-
-        public void setListener(AuthConfigRegistrationListener listener) {
-            this.listener = listener;
-        }
-
-        public void disable() {
-            this.wLock.lock();
-            try {
-                setEnabled(false);
-            } finally {
-                this.wLock.unlock();
-                data = null;
-            }
-            if (factory != null) {
-                String[] ids = factory.detachListener(this.listener, layer, appCtxt);
-//                if (ids != null) {
-//                    for (int i=0; i < ids.length; i++) {
-//                        factory.removeRegistration(ids[i]);
-//                    }
-//                }
-                if (getJmacProviderRegisID() != null) {
-                    factory.removeRegistration(getJmacProviderRegisID());
-                }
-            }
-        }
-
-        // detach the listener, but dont remove-registration
-        public void disableWithRefCount() {
-            if (referenceCount <= 1) {
-                disable();
-                if (delegate != null) {
-                    delegate.removeListener(this);
-                }
-            } else {
-                try {
-                    this.wLock.lock();
-                    referenceCount--;
-                } finally {
-                    this.wLock.unlock();
-                }
-
-            }
-        }
-
-        public void incrementReference() {
-            try {
-                this.wLock.lock();
-                referenceCount++;
-            } finally {
-                this.wLock.unlock();
-            }
-        }
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public String getJmacProviderRegisID() {
-            return this.jmacProviderRegisID;
-        }
-
-        public void setJmacProviderRegisID(String jmacProviderRegisID) {
-            this.jmacProviderRegisID = jmacProviderRegisID;
-        }
-
-        private ConfigData getConfigData() {
-            return data;
-        }
-
-        private void setConfigData(ConfigData data) {
-            this.data = data;
-        }
-
-        public class AuthConfigRegistrationListener implements RegistrationListener {
-
-            private String layer;
-            private String appCtxt;
-
-            public AuthConfigRegistrationListener(String layer, String appCtxt) {
-                this.layer = layer;
-                this.appCtxt = appCtxt;
-            }
-
-            public void notify(String layer, String appContext) {
-                if (this.layer.equals(layer) && ((this.appCtxt == null && appContext == null) || (appContext != null && appContext.equals(this.appCtxt)))) {
-                    try {
-                        wLock.lock();
-                        data = null;
-                    } finally {
-                        wLock.unlock();
-                    }
-                }
-            }
-
-        }
-    }
-
+    
+    
 }
