@@ -26,6 +26,8 @@ import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
+import org.omnifaces.elios.config.module.config.ClientAuthConfigImpl;
+import org.omnifaces.elios.config.module.config.ServerAuthConfigImpl;
 
 import javax.security.auth.message.config.AuthConfigProvider;
 import javax.security.auth.message.config.ClientAuthConfig;
@@ -159,13 +161,13 @@ public abstract class AuthConfigProviderHelper implements AuthConfigProvider {
 
     @Override
     public ClientAuthConfig getClientAuthConfig(String layer, String appContext, CallbackHandler cbh) throws AuthException {
-        return new ClientAuthConfigHelper(getLoggerName(), epochCarrier, getAuthContextHelper(appContext, true), getMessagePolicyDelegate(appContext), layer,
+        return new ClientAuthConfigImpl(getLoggerName(), epochCarrier, getAuthContextHelper(appContext, true), getMessagePolicyDelegate(appContext), layer,
                 appContext, getClientCallbackHandler(cbh));
     }
 
     @Override
     public ServerAuthConfig getServerAuthConfig(String layer, String appContext, CallbackHandler cbh) throws AuthException {
-        return new ServerAuthConfigHelper(getLoggerName(), epochCarrier, getAuthContextHelper(appContext, true), getMessagePolicyDelegate(appContext), layer,
+        return new ServerAuthConfigImpl(getLoggerName(), epochCarrier, getAuthContextHelper(appContext, true), getMessagePolicyDelegate(appContext), layer,
                 appContext, getServerCallbackHandler(cbh));
     }
 
@@ -220,7 +222,7 @@ public abstract class AuthConfigProviderHelper implements AuthConfigProvider {
 
     public abstract RegistrationContext[] getSelfRegistrationContexts();
 
-    public abstract AuthContextHelper getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException;
+    public abstract ModulesManager getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException;
 
     public abstract MessagePolicyDelegate getMessagePolicyDelegate(String appContext) throws AuthException;
 }

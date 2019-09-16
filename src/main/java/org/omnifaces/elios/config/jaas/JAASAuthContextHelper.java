@@ -26,18 +26,19 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
+
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag;
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.AuthStatus;
 
-import org.omnifaces.elios.config.helper.AuthContextHelper;
+import org.omnifaces.elios.config.helper.ModulesManager;
 
 /**
  *
  * @author Ron Monzillo
  */
-public class JAASAuthContextHelper extends AuthContextHelper {
+public class JAASAuthContextHelper extends ModulesManager {
 
     private static final String DEFAULT_ENTRY_NAME = "other";
     private static final Class[] PARAMS = {};
@@ -125,7 +126,8 @@ public class JAASAuthContextHelper extends AuthContextHelper {
     }
 
     @Override
-    protected final void refresh() {
+    public
+    final void refresh() {
         jaasConfig.refresh();
         initialize();
     }

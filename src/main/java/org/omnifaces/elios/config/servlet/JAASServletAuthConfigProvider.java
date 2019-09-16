@@ -26,7 +26,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
-import org.omnifaces.elios.config.helper.AuthContextHelper;
+import org.omnifaces.elios.config.helper.ModulesManager;
 import org.omnifaces.elios.config.jaas.JAASAuthConfigProvider;
 
 /**
@@ -118,7 +118,7 @@ public class JAASServletAuthConfigProvider extends JAASAuthConfigProvider {
     }
 
     @Override
-    public AuthContextHelper getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
+    public ModulesManager getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
         // overrides returnNullContexts to false (as required by Servlet Profile)
         return super.getAuthContextHelper(appContext, false);
     }

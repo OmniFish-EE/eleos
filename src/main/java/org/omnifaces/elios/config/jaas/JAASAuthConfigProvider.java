@@ -25,7 +25,7 @@ import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.omnifaces.elios.config.helper.AuthConfigProviderHelper;
-import org.omnifaces.elios.config.helper.AuthContextHelper;
+import org.omnifaces.elios.config.helper.ModulesManager;
 
 /**
  *
@@ -120,7 +120,7 @@ public abstract class JAASAuthConfigProvider extends AuthConfigProviderHelper {
     }
 
     @Override
-    public AuthContextHelper getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
+    public ModulesManager getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
         return new JAASAuthContextHelper(getLoggerName(), returnNullContexts, jaasConfig, properties, appContext);
     }
 
