@@ -20,21 +20,21 @@
  * Created on April 21, 2004, 11:56 AM
  */
 
-package org.omnifaces.elios.services.callback;
+package org.omnifaces.elios.config.helper;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyStore;
 import java.security.KeyStore.PrivateKeyEntry;
 import java.security.KeyStoreException;
-import java.security.InvalidAlgorithmParameterException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
-import java.security.PrivilegedAction;
 import java.security.PrivateKey;
-import java.security.cert.Certificate;
+import java.security.PrivilegedAction;
 import java.security.cert.CertStore;
+import java.security.cert.Certificate;
 import java.security.cert.CollectionCertStoreParameters;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -42,13 +42,14 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.login.LoginException;
 import javax.security.auth.message.callback.CallerPrincipalCallback;
 import javax.security.auth.message.callback.CertStoreCallback;
 import javax.security.auth.message.callback.GroupPrincipalCallback;
@@ -57,9 +58,8 @@ import javax.security.auth.message.callback.PrivateKeyCallback;
 import javax.security.auth.message.callback.SecretKeyCallback;
 import javax.security.auth.message.callback.TrustStoreCallback;
 import javax.security.auth.x500.X500Principal;
+import javax.swing.GroupLayout.Group;
 
-//V3:Commented import com.sun.enterprise.Switch;
-import org.glassfish.security.common.Group;
 import org.glassfish.security.common.PrincipalImpl;
 import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
 import org.omnifaces.elios.services.config.CallbackHandlerConfig;
@@ -68,20 +68,11 @@ import org.omnifaces.enterprise.security.SecurityContext;
 import org.omnifaces.enterprise.security.SecurityServicesUtil;
 import org.omnifaces.enterprise.security.auth.login.DistinguishedPrincipalCredential;
 import org.omnifaces.enterprise.security.auth.login.LoginContextDriver;
-import org.omnifaces.enterprise.security.auth.login.common.LoginException;
 import org.omnifaces.enterprise.security.auth.realm.certificate.CertificateRealm;
-import org.omnifaces.enterprise.security.common.AppservAccessController;
-import org.omnifaces.enterprise.security.ssl.SSLUtils;
 import org.omnifaces.enterprise.security.store.PasswordAdapter;
 import org.omnifaces.enterprise.security.web.integration.WebPrincipal;
-import org.omnifaces.enterprise.server.pluggable.SecuritySupport;
-import org.omnifaces.logging.LogDomains;
-import org.glassfish.security.common.MasterPassword;
-
-import java.util.Set;
 
 import sun.security.util.DerValue;
-import org.glassfish.internal.api.Globals;
 
 /**
  * Base Callback Handler for JSR 196
@@ -97,26 +88,11 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
     private static final String CLIENT_SECRET_KEYSTORE = "com.sun.appserv.client.secretKeyStore";
     private static final String CLIENT_SECRET_KEYSTORE_PASSWORD = "com.sun.appserv.client.secretKeyStorePassword";
 
-    protected final static Logger _logger = LogDomains.getLogger(BaseContainerCallbackHandler.class, LogDomains.SECURITY_LOGGER);
 
     protected HandlerContext handlerContext = null;
 
-    // TODO: inject them once this class becomes a component
-    protected final SSLUtils sslUtils;
-    protected final SecuritySupport secSup;
-    protected final MasterPassword masterPasswordHelper;
 
     protected BaseContainerCallbackHandler() {
-        if (Globals.getDefaultHabitat() == null) {
-            sslUtils = new SSLUtils();
-            secSup = SecuritySupport.getDefaultInstance();
-            masterPasswordHelper = null;
-            sslUtils.postConstruct();
-        } else {
-            sslUtils = Globals.getDefaultHabitat().getService(SSLUtils.class);
-            secSup = Globals.getDefaultHabitat().getService(SecuritySupport.class);
-            masterPasswordHelper = Globals.getDefaultHabitat().getService(MasterPassword.class, "Security SSL Password Provider Service");
-        }
     }
 
     public void setHandlerContext(HandlerContext handlerContext) {
@@ -140,9 +116,6 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
 
         for (Callback callback : callbacks) {
             if (!isSupportedCallback(callback)) {
-                if (_logger.isLoggable(Level.FINE)) {
-                    _logger.log(Level.FINE, "JMAC: UnsupportedCallback : " + callback.getClass().getName());
-                }
                 throw new UnsupportedCallbackException(callback);
             }
         }
@@ -164,10 +137,6 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
             processPrivateKey((PrivateKeyCallback) callback);
         } else if (callback instanceof TrustStoreCallback) {
             TrustStoreCallback tstoreCallback = (TrustStoreCallback) callback;
-            if (_logger.isLoggable(Level.FINE)) {
-                _logger.log(Level.FINE, "JMAC: In TrustStoreCallback Processor");
-            }
-            tstoreCallback.setTrustStore(sslUtils.getMergedTrustStore());
 
         } else if (callback instanceof CertStoreCallback) {
             processCertStore((CertStoreCallback) callback);
@@ -176,9 +145,6 @@ abstract class BaseContainerCallbackHandler implements CallbackHandler, Callback
         } else {
             // sanity check =- should never come here.
             // the isSupportedCallback method already takes care of this case
-            if (_logger.isLoggable(Level.FINE)) {
-                _logger.log(Level.FINE, "JMAC: UnsupportedCallback : " + callback.getClass().getName());
-            }
             throw new UnsupportedCallbackException(callback);
         }
     }

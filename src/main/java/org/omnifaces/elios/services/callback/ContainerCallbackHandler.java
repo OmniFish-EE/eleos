@@ -31,6 +31,8 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import org.glassfish.internal.api.Globals;
 import org.jvnet.hk2.annotations.ContractsProvided;
 import org.jvnet.hk2.annotations.Service;
+import org.omnifaces.elios.config.helper.BaseContainerCallbackHandler;
+import org.omnifaces.elios.config.helper.ServerCallbackHandler;
 import org.omnifaces.elios.services.config.CallbackHandlerConfig;
 import org.omnifaces.elios.services.config.HandlerContext;
 import org.omnifaces.enterprise.security.SecurityServicesUtil;
@@ -47,7 +49,7 @@ public final class ContainerCallbackHandler implements CallbackHandler, Callback
         if (Globals.getDefaultHabitat() == null || SecurityServicesUtil.getInstance().isACC()) {
             handler = new ClientContainerCallbackHandler();
         } else {
-            handler = new ServerContainerCallbackHandler();
+            handler = new ServerCallbackHandler();
         }
     }
 

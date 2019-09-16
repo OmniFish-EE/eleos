@@ -38,6 +38,7 @@ import javax.security.auth.message.callback.PrivateKeyCallback;
 import javax.security.auth.message.callback.SecretKeyCallback;
 import javax.security.auth.message.callback.TrustStoreCallback;
 
+import org.omnifaces.elios.config.helper.BaseContainerCallbackHandler;
 import org.omnifaces.enterprise.security.SecurityServicesUtil;
 import org.omnifaces.enterprise.security.UsernamePasswordStore;
 
