@@ -46,10 +46,10 @@ import javax.security.auth.message.config.ServerAuthContext;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.omnifaces.jaspic.config.factory.AuthConfigFileFactory;
-import org.omnifaces.jaspic.config.factory.BaseAuthConfigFactory;
-import org.omnifaces.jaspic.config.factory.EntryInfo;
-import org.omnifaces.jaspic.config.factory.RegStoreFileParser;
+import org.omnifaces.elios.config.factory.AuthConfigFileFactory;
+import org.omnifaces.elios.config.factory.BaseAuthConfigFactory;
+import org.omnifaces.elios.config.factory.EntryInfo;
+import org.omnifaces.elios.config.factory.RegStoreFileParser;
 
 import static org.junit.Assert.*;
 
