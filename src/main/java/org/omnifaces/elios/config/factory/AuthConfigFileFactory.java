@@ -16,6 +16,8 @@
 
 package org.omnifaces.elios.config.factory;
 
+import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
+
 /**
  *
  * @author ronmonzillo

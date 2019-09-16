@@ -21,8 +21,8 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import org.omnifaces.elios.config.factory.BaseAuthConfigFactory;
-import org.omnifaces.elios.config.factory.EntryInfo;
-import org.omnifaces.elios.config.factory.RegStoreFileParser;
+import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
+import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
 import org.omnifaces.elios.services.WebServicesDelegate;
 import org.omnifaces.enterprise.security.SecurityServicesUtil;
 
@@ -89,20 +89,20 @@ public class GFAuthConfigFactory extends BaseAuthConfigFactory {
     /*
      * Contains the default providers used when none are configured in a factory configuration file.
      */
-    static List<EntryInfo> getDefaultProviders() {
+    static List<AuthConfigProviderEntry> getDefaultProviders() {
         WebServicesDelegate delegate = null;
         SecurityServicesUtil svcUtil = SecurityServicesUtil.getInstance();
         if (svcUtil != null) {
             delegate = svcUtil.getHabitat().getService(WebServicesDelegate.class);
         }
         if (delegate != null) {
-            List<EntryInfo> entries = new ArrayList<EntryInfo>(2);
-            entries.add(new EntryInfo(delegate.getDefaultWebServicesProvider(), null));
-            entries.add(new EntryInfo(GFServerConfigProvider.class.getName(), null));
+            List<AuthConfigProviderEntry> entries = new ArrayList<AuthConfigProviderEntry>(2);
+            entries.add(new AuthConfigProviderEntry(delegate.getDefaultWebServicesProvider(), null));
+            entries.add(new AuthConfigProviderEntry(GFServerConfigProvider.class.getName(), null));
             return entries;
         }
-        List<EntryInfo> entries = new ArrayList<EntryInfo>(1);
-        entries.add(new EntryInfo(GFServerConfigProvider.class.getName(), null));
+        List<AuthConfigProviderEntry> entries = new ArrayList<AuthConfigProviderEntry>(1);
+        entries.add(new AuthConfigProviderEntry(GFServerConfigProvider.class.getName(), null));
         return entries;
     }
 

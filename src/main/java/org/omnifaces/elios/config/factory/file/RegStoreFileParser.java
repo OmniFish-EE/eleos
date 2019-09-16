@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  */
 
-package org.omnifaces.elios.config.factory;
+package org.omnifaces.elios.config.factory.file;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -32,6 +32,7 @@ import java.util.logging.Logger;
 
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
+import org.omnifaces.elios.config.factory.RegistrationContextImpl;
 import org.omnifaces.elios.config.helper.JASPICLogManager;
 
 /**
@@ -55,17 +56,17 @@ public final class RegStoreFileParser {
     private static final String[] INDENT = { "", "  ", "    " };
 
     private final File confFile;
-    private List<EntryInfo> entries;
-    private List<EntryInfo> defaultEntries;
+    private List<AuthConfigProviderEntry> entries;
+    private List<AuthConfigProviderEntry> defaultEntries;
 
     /*
      * Loads the configuration file from the given filename. If a file is not found, then the default entries are used.
      * Otherwise the file is parsed to load the entries.
      *
      */
-    public RegStoreFileParser(String pathParent, String pathChild, List<EntryInfo> defaultEntries) {
+    public RegStoreFileParser(String pathParent, String pathChild, List<AuthConfigProviderEntry> defaultEntries) {
         confFile = new File(pathParent, pathChild);
-        this.defaultEntries = defaultEntries == null ? new ArrayList<EntryInfo>() : defaultEntries;
+        this.defaultEntries = defaultEntries == null ? new ArrayList<AuthConfigProviderEntry>() : defaultEntries;
         try {
             loadEntries();
         } catch (IOException ioe) {
@@ -90,7 +91,7 @@ public final class RegStoreFileParser {
     /*
      * Returns the in-memory list of entries. MUST Hold exclusive lock on calling factory while processing entries
      */
-    List<EntryInfo> getPersistedEntries() {
+    public List<AuthConfigProviderEntry> getPersistedEntries() {
         return entries;
     }
 
@@ -98,7 +99,7 @@ public final class RegStoreFileParser {
      * Adds the provider to the entry list if it is not already present, creates the configuration file if necessary, and
      * writes the entries to the file.
      */
-    void store(String className, RegistrationContext ctx, Map properties) {
+    public void store(String className, RegistrationContext ctx, Map properties) {
         synchronized (confFile) {
             if (checkAndAddToList(className, ctx, properties)) {
                 try {
@@ -114,7 +115,7 @@ public final class RegStoreFileParser {
      * Removes the provider from the entry list if it is already present, creates the configuration file if necessary, and
      * writes the entries to the file.
      */
-    void delete(RegistrationContext ctx) {
+    public void delete(RegistrationContext ctx) {
         synchronized (confFile) {
             if (checkAndRemoveFromList(ctx)) {
                 try {
@@ -136,8 +137,8 @@ public final class RegStoreFileParser {
         if (props != null && props.isEmpty()) {
             props = null;
         }
-        EntryInfo newEntry = new EntryInfo(className, props, ctx);
-        EntryInfo entry = getMatchingRegEntry(newEntry);
+        AuthConfigProviderEntry newEntry = new AuthConfigProviderEntry(className, props, ctx);
+        AuthConfigProviderEntry entry = getMatchingRegEntry(newEntry);
 
         // there is no matching entry, so add to list
         if (entry == null) {
@@ -164,10 +165,10 @@ public final class RegStoreFileParser {
     private boolean checkAndRemoveFromList(RegistrationContext target) {
         boolean retValue = false;
         try {
-            ListIterator<EntryInfo> lit = entries.listIterator();
+            ListIterator<AuthConfigProviderEntry> lit = entries.listIterator();
             while (lit.hasNext()) {
 
-                EntryInfo info = lit.next();
+                AuthConfigProviderEntry info = lit.next();
                 if (info.isConstructorEntry()) {
                     continue;
                 }
@@ -194,8 +195,8 @@ public final class RegStoreFileParser {
      * Used to find a matching registration entry in the 'entries' list without including registration contexts. If there is
      * not a matching entry, return null.
      */
-    private EntryInfo getMatchingRegEntry(EntryInfo target) {
-        for (EntryInfo info : entries) {
+    private AuthConfigProviderEntry getMatchingRegEntry(AuthConfigProviderEntry target) {
+        for (AuthConfigProviderEntry info : entries) {
             if (!info.isConstructorEntry() && info.matchConstructors(target)) {
                 return info;
             }
@@ -213,7 +214,7 @@ public final class RegStoreFileParser {
         clearExistingFile();
         PrintWriter out = new PrintWriter(confFile);
         int indent = 0;
-        for (EntryInfo info : entries) {
+        for (AuthConfigProviderEntry info : entries) {
             if (info.isConstructorEntry()) {
                 writeConEntry(info, out, indent);
             } else {
@@ -228,7 +229,7 @@ public final class RegStoreFileParser {
      * appearance of a colon ":" separates the key and value of the property (so a value may contain a colon as part of the
      * string). For instance: "mydir:c:foo" would have key "mydir" and value "c:foo".
      */
-    private void writeConEntry(EntryInfo info, PrintWriter out, int i) {
+    private void writeConEntry(AuthConfigProviderEntry info, PrintWriter out, int i) {
         out.println(INDENT[i++] + CON_ENTRY + " {");
         out.println(INDENT[i] + info.getClassName());
         Map<String, String> props = info.getProperties();
@@ -244,7 +245,7 @@ public final class RegStoreFileParser {
      * Write registration entry output of the form: <pre> reg-entry { con-entry { see writeConEntry() for detail } reg-ctx {
      * layer:HttpServlet app-ctx:security-jmac-https description:My provider } } </pre>
      */
-    private void writeRegEntry(EntryInfo info, PrintWriter out, int i) {
+    private void writeRegEntry(AuthConfigProviderEntry info, PrintWriter out, int i) {
         out.println(INDENT[i++] + REG_ENTRY + " {");
         if (info.getClassName() != null) {
             writeConEntry(info, out, i);
@@ -286,7 +287,7 @@ public final class RegStoreFileParser {
      */
     private void loadEntries() throws IOException {
         synchronized (confFile) {
-            entries = new ArrayList<EntryInfo>();
+            entries = new ArrayList<AuthConfigProviderEntry>();
             if (confFile.exists()) {
                 try (BufferedReader reader = new BufferedReader(new FileReader(confFile))) {
                     String line = reader.readLine();
@@ -305,21 +306,21 @@ public final class RegStoreFileParser {
                     logger.log(Level.FINER, "jmac.factory_file_not_found", confFile.getParent() + File.pathSeparator + confFile.getPath());
 
                 }
-                for (EntryInfo e : defaultEntries) {
-                    entries.add(new EntryInfo(e));
+                for (AuthConfigProviderEntry e : defaultEntries) {
+                    entries.add(new AuthConfigProviderEntry(e));
                 }
             }
         }
     }
 
-    private EntryInfo readConEntry(BufferedReader reader) throws IOException {
+    private AuthConfigProviderEntry readConEntry(BufferedReader reader) throws IOException {
         // entry must contain class name as next line
         String className = reader.readLine();
         if (className != null) {
             className = className.trim();
         }
         Map<String, String> properties = readProperties(reader);
-        return new EntryInfo(className, properties);
+        return new AuthConfigProviderEntry(className, properties);
     }
 
     /*
@@ -347,7 +348,7 @@ public final class RegStoreFileParser {
         return properties;
     }
 
-    private EntryInfo readRegEntry(BufferedReader reader) throws IOException {
+    private AuthConfigProviderEntry readRegEntry(BufferedReader reader) throws IOException {
         String className = null;
         Map<String, String> properties = null;
         List<RegistrationContext> ctxs = new ArrayList<RegistrationContext>();
@@ -357,7 +358,7 @@ public final class RegStoreFileParser {
         }
         while (!"}".equals(line)) {
             if (line.startsWith(CON_ENTRY)) {
-                EntryInfo conEntry = readConEntry(reader);
+                AuthConfigProviderEntry conEntry = readConEntry(reader);
                 className = conEntry.getClassName();
                 properties = conEntry.getProperties();
             } else if (line.startsWith(REG_CTX)) {
@@ -369,7 +370,7 @@ public final class RegStoreFileParser {
             }
 
         }
-        return new EntryInfo(className, properties, ctxs);
+        return new AuthConfigProviderEntry(className, properties, ctxs);
     }
 
     private RegistrationContext readRegContext(BufferedReader reader) throws IOException {

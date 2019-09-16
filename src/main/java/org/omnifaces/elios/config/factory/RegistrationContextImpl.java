@@ -18,18 +18,20 @@ package org.omnifaces.elios.config.factory;
 
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
+import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
+
 /*
  * Class used by GFAuthConfigFactory and EntryInfo.
  *
  * This class will not be used outside of its package.
  */
-final class RegistrationContextImpl implements RegistrationContext {
+public final class RegistrationContextImpl implements RegistrationContext {
     private final String messageLayer;
     private final String appContext;
     private final String description;
     private final boolean isPersistent;
 
-    RegistrationContextImpl(String messageLayer, String appContext, String description, boolean persistent) {
+    public RegistrationContextImpl(String messageLayer, String appContext, String description, boolean persistent) {
 
         this.messageLayer = messageLayer;
         this.appContext = appContext;
@@ -38,7 +40,7 @@ final class RegistrationContextImpl implements RegistrationContext {
     }
 
     // helper method to create impl class
-    RegistrationContextImpl(RegistrationContext ctx) {
+    public RegistrationContextImpl(RegistrationContext ctx) {
         this.messageLayer = ctx.getMessageLayer();
         this.appContext = ctx.getAppContext();
         this.description = ctx.getDescription();
@@ -71,7 +73,7 @@ final class RegistrationContextImpl implements RegistrationContext {
             return false;
         }
         RegistrationContext target = (RegistrationContext) o;
-        return (EntryInfo.matchStrings(messageLayer, target.getMessageLayer()) && EntryInfo.matchStrings(appContext, target.getAppContext())
+        return (AuthConfigProviderEntry.matchStrings(messageLayer, target.getMessageLayer()) && AuthConfigProviderEntry.matchStrings(appContext, target.getAppContext())
                 && isPersistent() == target.isPersistent());
     }
 

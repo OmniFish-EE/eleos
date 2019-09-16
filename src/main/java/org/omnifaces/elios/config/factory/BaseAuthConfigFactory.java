@@ -17,7 +17,6 @@
 package org.omnifaces.elios.config.factory;
 
 import java.lang.reflect.Constructor;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,10 +30,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.security.auth.message.AuthException;
 import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigProvider;
 import javax.security.auth.message.config.RegistrationListener;
 
+import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
+import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
 import org.omnifaces.elios.config.helper.JASPICLogManager;
 
 /**
@@ -537,9 +539,9 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
         try {
             initializeMaps();
 
-            List<EntryInfo> entryList = getRegStore().getPersistedEntries();
+            List<AuthConfigProviderEntry> entryList = getRegStore().getPersistedEntries();
 
-            for (EntryInfo info : entryList) {
+            for (AuthConfigProviderEntry info : entryList) {
                 if (info.isConstructorEntry()) {
                     _constructProvider(info.getClassName(), info.getProperties(), this);
                 } else {
