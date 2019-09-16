@@ -1,4 +1,26 @@
 package org.omnifaces.elios.config.module.context;
+
+import java.security.AccessController;
+import java.security.Principal;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.message.AuthException;
+import javax.security.auth.message.AuthStatus;
+import javax.security.auth.message.MessageInfo;
+import javax.security.auth.message.callback.CallerPrincipalCallback;
+import javax.security.auth.message.config.ServerAuthContext;
+import javax.security.auth.message.module.ServerAuthModule;
+
+import org.omnifaces.elios.config.module.config.GFServerAuthConfig;
+import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
+
 public class GFServerAuthContext implements ServerAuthContext {
 
         private GFServerAuthConfig config;

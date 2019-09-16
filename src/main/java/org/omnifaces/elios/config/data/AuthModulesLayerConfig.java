@@ -2,12 +2,12 @@ package org.omnifaces.elios.config.data;
 
 import java.util.HashMap;
 
-public class InterceptEntry {
-    String defaultClientID;
-    String defaultServerID;
-    HashMap idMap;
+public class AuthModulesLayerConfig {
+    public String defaultClientID;
+    public String defaultServerID;
+    public HashMap idMap;
 
-    public InterceptEntry(String defaultClientID, String defaultServerID, HashMap idMap) {
+    public AuthModulesLayerConfig(String defaultClientID, String defaultServerID, HashMap idMap) {
         this.defaultClientID = defaultClientID;
         this.defaultServerID = defaultServerID;
         this.idMap = idMap;

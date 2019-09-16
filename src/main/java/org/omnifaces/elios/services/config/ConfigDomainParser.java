@@ -133,14 +133,14 @@ public class ConfigDomainParser implements ConfigParser {
             layersWithDefault.add(intercept);
         }
 
-        GFServerConfigProvider.InterceptEntry intEntry = (GFServerConfigProvider.InterceptEntry) newConfig.get(intercept);
+        GFServerConfigProvider.AuthModulesLayerConfig intEntry = (GFServerConfigProvider.AuthModulesLayerConfig) newConfig.get(intercept);
 
         if (intEntry != null) {
             throw new IOException("found multiple MessageSecurityConfig " + "entries with the same auth-layer");
         }
 
         // create new intercept entry
-        intEntry = new GFServerConfigProvider.InterceptEntry(defaultClientID, defaultServerID, null);
+        intEntry = new GFServerConfigProvider.AuthModulesLayerConfig(defaultClientID, defaultServerID, null);
         newConfig.put(intercept, intEntry);
         return intercept;
     }
@@ -188,9 +188,9 @@ public class ConfigDomainParser implements ConfigParser {
         }
 
         // create ID entry
-        GFServerConfigProvider.IDEntry idEntry = new GFServerConfigProvider.IDEntry(type, moduleClass, requestPolicy, responsePolicy, options);
+        GFServerConfigProvider.AuthModuleConfig idEntry = new GFServerConfigProvider.AuthModuleConfig(type, moduleClass, requestPolicy, responsePolicy, options);
 
-        GFServerConfigProvider.InterceptEntry intEntry = (GFServerConfigProvider.InterceptEntry) newConfig.get(intercept);
+        GFServerConfigProvider.AuthModulesLayerConfig intEntry = (GFServerConfigProvider.AuthModulesLayerConfig) newConfig.get(intercept);
         if (intEntry == null) {
             throw new IOException("intercept entry for " + intercept + " must be specified before ID entries");
         }

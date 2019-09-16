@@ -10,22 +10,22 @@ import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.module.ServerAuthModule;
 
-import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider.ModuleInfo;
+import org.omnifaces.elios.config.data.AuthModuleInstanceHolder;
 import org.omnifaces.elios.config.module.context.GFServerAuthContext;
 
 public class GFServerAuthConfig extends GFAuthConfig implements ServerAuthConfig {
 
-    protected GFServerAuthConfig(AuthConfigProvider provider, String layer, String appContext, CallbackHandler handler) {
+    public GFServerAuthConfig(AuthConfigProvider provider, String layer, String appContext, CallbackHandler handler) {
         super(provider, layer, appContext, handler, SERVER);
     }
 
     public ServerAuthContext getAuthContext(String authContextID, Subject serviceSubject, Map properties) throws AuthException {
         ServerAuthContext serverAuthContext = null;
-        ModuleInfo moduleInfo = getModuleInfo(authContextID, properties);
+        AuthModuleInstanceHolder authModuleInstanceHolder = getModuleInfo(authContextID, properties);
 
-        if (moduleInfo != null && moduleInfo.getModule() != null) {
-            Object moduleObj = moduleInfo.getModule();
-            Map map = moduleInfo.getMap();
+        if (authModuleInstanceHolder != null && authModuleInstanceHolder.getModule() != null) {
+            Object moduleObj = authModuleInstanceHolder.getModule();
+            Map map = authModuleInstanceHolder.getMap();
             if (moduleObj instanceof ServerAuthModule) {
                 serverAuthContext = new GFServerAuthContext(this, (ServerAuthModule) moduleObj, map);
             }

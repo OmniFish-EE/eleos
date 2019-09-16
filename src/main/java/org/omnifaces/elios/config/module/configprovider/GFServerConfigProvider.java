@@ -41,10 +41,10 @@ import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.module.ClientAuthModule;
 import javax.security.auth.message.module.ServerAuthModule;
 
-import org.omnifaces.elios.config.data.Entry;
-import org.omnifaces.elios.config.data.IDEntry;
-import org.omnifaces.elios.config.data.InterceptEntry;
-import org.omnifaces.elios.config.data.ModuleInfo;
+import org.omnifaces.elios.config.data.AuthModuleBaseConfig;
+import org.omnifaces.elios.config.data.AuthModuleConfig;
+import org.omnifaces.elios.config.data.AuthModuleInstanceHolder;
+import org.omnifaces.elios.config.data.AuthModulesLayerConfig;
 import org.omnifaces.elios.config.factory.ConfigParser;
 import org.omnifaces.elios.config.module.config.GFClientAuthConfig;
 import org.omnifaces.elios.config.module.config.GFServerAuthConfig;
@@ -65,7 +65,7 @@ public class GFServerConfigProvider implements AuthConfigProvider {
 
     protected static final String CLIENT = "client";
     protected static final String SERVER = "server";
-    protected static final String MANAGES_SESSIONS_OPTION = "managessessions";
+    public static final String MANAGES_SESSIONS_OPTION = "managessessions";
 
     private static final String DEFAULT_HANDLER_CLASS = "com.sun.enterprise.security.jmac.callback.ContainerCallbackHandler";
     private static final String DEFAULT_PARSER_CLASS = "com.sun.enterprise.security.jmac.config.ConfigDomainParser";
@@ -161,13 +161,13 @@ public class GFServerConfigProvider implements AuthConfigProvider {
     /**
      * Instantiate+initialize module class
      */
-    static ModuleInfo createModuleInfo(Entry entry, CallbackHandler handler, String type, Map properties) throws AuthException {
+    static AuthModuleInstanceHolder createModuleInfo(AuthModuleBaseConfig authModuleBaseConfig, CallbackHandler handler, String type, Map properties) throws AuthException {
         try {
             // instantiate module using no-arg constructor
-            Object newModule = entry.newInstance();
+            Object newModule = authModuleBaseConfig.newInstance();
 
             Map map = properties;
-            Map entryOptions = entry.getOptions();
+            Map entryOptions = authModuleBaseConfig.getOptions();
 
             if (entryOptions != null) {
                 if (map == null) {
@@ -182,16 +182,16 @@ public class GFServerConfigProvider implements AuthConfigProvider {
             if (SERVER.equals(type)) {
                 if (newModule instanceof ServerAuthModule) {
                     ServerAuthModule sam = (ServerAuthModule) newModule;
-                    sam.initialize(entry.getRequestPolicy(), entry.getResponsePolicy(), handler, map);
+                    sam.initialize(authModuleBaseConfig.getRequestPolicy(), authModuleBaseConfig.getResponsePolicy(), handler, map);
                 }
             } else { // CLIENT
                 if (newModule instanceof ClientAuthModule) {
                     ClientAuthModule cam = (ClientAuthModule) newModule;
-                    cam.initialize(entry.getRequestPolicy(), entry.getResponsePolicy(), handler, map);
+                    cam.initialize(authModuleBaseConfig.getRequestPolicy(), authModuleBaseConfig.getResponsePolicy(), handler, map);
                 }
             }
 
-            return new ModuleInfo(newModule, map);
+            return new AuthModuleInstanceHolder(newModule, map);
         } catch (Exception e) {
             if (e instanceof AuthException) {
                 throw (AuthException) e;
@@ -230,7 +230,7 @@ public class GFServerConfigProvider implements AuthConfigProvider {
         }
     }
 
-    Entry getEntry(String intercept, String id, MessagePolicy requestPolicy, MessagePolicy responsePolicy, String type) {
+    AuthModuleBaseConfig getEntry(String intercept, String id, MessagePolicy requestPolicy, MessagePolicy responsePolicy, String type) {
 
         // get the parsed module config and DD information
 
@@ -249,7 +249,7 @@ public class GFServerConfigProvider implements AuthConfigProvider {
 
         // get the module config info for this intercept
 
-        InterceptEntry intEntry = (InterceptEntry) configMap.get(intercept);
+        AuthModulesLayerConfig intEntry = (AuthModulesLayerConfig) configMap.get(intercept);
         if (intEntry == null || intEntry.idMap == null) {
             if (logger.isLoggable(Level.FINE)) {
                 logger.fine("module config has no IDs configured for [" + intercept + "]");
@@ -259,8 +259,8 @@ public class GFServerConfigProvider implements AuthConfigProvider {
 
         // look up the DD's provider ID in the module config
 
-        IDEntry idEntry = null;
-        if (id == null || (idEntry = (IDEntry) intEntry.idMap.get(id)) == null) {
+        AuthModuleConfig idEntry = null;
+        if (id == null || (idEntry = (AuthModuleConfig) intEntry.idMap.get(id)) == null) {
 
             // either the DD did not specify a provider ID,
             // or the DD-specified provider ID was not found
@@ -280,7 +280,7 @@ public class GFServerConfigProvider implements AuthConfigProvider {
                 defaultID = intEntry.defaultServerID;
             }
 
-            idEntry = (IDEntry) intEntry.idMap.get(defaultID);
+            idEntry = (AuthModuleConfig) intEntry.idMap.get(defaultID);
             if (idEntry == null) {
 
                 // did not find a default provider ID
@@ -318,14 +318,14 @@ public class GFServerConfigProvider implements AuthConfigProvider {
 
         // return the configured modules with the correct policies
 
-        Entry entry = new Entry(idEntry.moduleClassName, reqP, respP, idEntry.options);
+        AuthModuleBaseConfig authModuleBaseConfig = new AuthModuleBaseConfig(idEntry.moduleClassName, reqP, respP, idEntry.options);
 
         if (logger.isLoggable(Level.FINE)) {
-            logger.fine("getEntry for: " + intercept + " -- " + id + "\n    module class: " + entry.moduleClassName + "\n    options: " + entry.options
-                    + "\n    request policy: " + entry.requestPolicy + "\n    response policy: " + entry.responsePolicy);
+            logger.fine("getEntry for: " + intercept + " -- " + id + "\n    module class: " + authModuleBaseConfig.moduleClassName + "\n    options: " + authModuleBaseConfig.options
+                    + "\n    request policy: " + authModuleBaseConfig.requestPolicy + "\n    response policy: " + authModuleBaseConfig.responsePolicy);
         }
 
-        return entry;
+        return authModuleBaseConfig;
     }
 
     

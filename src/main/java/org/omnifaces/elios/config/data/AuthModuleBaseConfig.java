@@ -2,7 +2,6 @@ package org.omnifaces.elios.config.data;
 
 import java.lang.reflect.Constructor;
 import java.util.Map;
-import java.util.logging.Level;
 
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.MessagePolicy;
@@ -14,16 +13,16 @@ import javax.security.auth.message.MessagePolicy;
  * This class also provides a way for a caller to obtain an instance of the module listed in the entry by invoking the
  * <code>newInstance</code> method.
  */
-public class Entry {
+public class AuthModuleBaseConfig {
 
     // for loading modules
     private static final Class[] PARAMS = {};
     private static final Object[] ARGS = {};
 
-    private String moduleClassName;
-    private MessagePolicy requestPolicy;
-    private MessagePolicy responsePolicy;
-    private Map options;
+    public String moduleClassName;
+    public MessagePolicy requestPolicy;
+    public MessagePolicy responsePolicy;
+    public Map options;
 
     /**
      * Construct a ConfigFile entry.
@@ -38,7 +37,7 @@ public class Entry {
      *
      * @param options the options configured for this module.
      */
-    Entry(String moduleClassName, MessagePolicy requestPolicy, MessagePolicy responsePolicy, Map options) {
+    public AuthModuleBaseConfig(String moduleClassName, MessagePolicy requestPolicy, MessagePolicy responsePolicy, Map options) {
         this.moduleClassName = moduleClassName;
         this.requestPolicy = requestPolicy;
         this.responsePolicy = responsePolicy;
@@ -50,7 +49,7 @@ public class Entry {
      *
      * @return the policy, which may be null.
      */
-    MessagePolicy getRequestPolicy() {
+    public MessagePolicy getRequestPolicy() {
         return requestPolicy;
     }
 
@@ -59,15 +58,15 @@ public class Entry {
      *
      * @return the policy, which may be null.
      */
-    MessagePolicy getResponsePolicy() {
+    public MessagePolicy getResponsePolicy() {
         return responsePolicy;
     }
 
-    String getModuleClassName() {
+    public String getModuleClassName() {
         return moduleClassName;
     }
 
-    Map getOptions() {
+    public Map getOptions() {
         return options;
     }
 
@@ -82,16 +81,13 @@ public class Entry {
      *
      * @exception AuthException if the instantiation failed.
      */
-    Object newInstance() throws AuthException {
+    public Object newInstance() throws AuthException {
         try {
-            final ClassLoader finalLoader = getClassLoader();
+            final ClassLoader finalLoader = null; // tmp
             Class c = Class.forName(moduleClassName, true, finalLoader);
             Constructor constructor = c.getConstructor(PARAMS);
             return constructor.newInstance(ARGS);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.WARNING)) {
-                logger.log(Level.WARNING, "jmac.provider_unable_to_load_authmodule", new String[] { moduleClassName, e.toString() });
-            }
 
             AuthException ae = new AuthException();
             ae.initCause(e);

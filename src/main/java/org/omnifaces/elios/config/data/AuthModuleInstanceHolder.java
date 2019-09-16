@@ -5,20 +5,20 @@ import java.util.Map;
 /**
  * A data object contains module object and the corresponding map.
  */
-public class ModuleInfo {
+public class AuthModuleInstanceHolder {
     private Object module;
     private Map map;
 
-    ModuleInfo(Object module, Map map) {
+    public AuthModuleInstanceHolder(Object module, Map map) {
         this.module = module;
         this.map = map;
     }
 
-    Object getModule() {
+    public Object getModule() {
         return module;
     }
 
-    Map getMap() {
+    public Map getMap() {
         return map;
     }
 }
