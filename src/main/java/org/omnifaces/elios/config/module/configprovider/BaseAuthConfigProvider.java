@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  */
 
-package org.omnifaces.elios.config.helper;
+package org.omnifaces.elios.config.module.configprovider;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -26,6 +26,8 @@ import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
+import org.omnifaces.elios.config.helper.EpochCarrier;
+import org.omnifaces.elios.config.helper.ModulesManager;
 import org.omnifaces.elios.config.module.config.ClientAuthConfigImpl;
 import org.omnifaces.elios.config.module.config.ServerAuthConfigImpl;
 
@@ -37,7 +39,7 @@ import javax.security.auth.message.config.ServerAuthConfig;
  *
  * @author Ron Monzillo
  */
-public abstract class AuthConfigProviderHelper implements AuthConfigProvider {
+public abstract class BaseAuthConfigProvider implements AuthConfigProvider {
 
     public static final String LAYER_NAME_KEY = "message.layer";
     public static final String ALL_LAYERS = "*";
@@ -51,7 +53,7 @@ public abstract class AuthConfigProviderHelper implements AuthConfigProvider {
     HashSet<String> selfRegistered;
     EpochCarrier epochCarrier;
 
-    protected AuthConfigProviderHelper() {
+    protected BaseAuthConfigProvider() {
         selfRegistered = new HashSet<String>();
         epochCarrier = new EpochCarrier();
     }
@@ -213,7 +215,7 @@ public abstract class AuthConfigProviderHelper implements AuthConfigProvider {
     }
 
     public String getLoggerName() {
-        return getProperty(LOGGER_NAME_KEY, AuthConfigProviderHelper.class.getName());
+        return getProperty(LOGGER_NAME_KEY, BaseAuthConfigProvider.class.getName());
     }
 
     public abstract Map<String, ?> getProperties();

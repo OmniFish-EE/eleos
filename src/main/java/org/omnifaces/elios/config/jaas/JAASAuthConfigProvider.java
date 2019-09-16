@@ -24,14 +24,14 @@ import javax.security.auth.message.AuthException;
 import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
-import org.omnifaces.elios.config.helper.AuthConfigProviderHelper;
 import org.omnifaces.elios.config.helper.ModulesManager;
+import org.omnifaces.elios.config.module.configprovider.BaseAuthConfigProvider;
 
 /**
  *
  * @author Ron Monzillo
  */
-public abstract class JAASAuthConfigProvider extends AuthConfigProviderHelper {
+public abstract class JAASAuthConfigProvider extends BaseAuthConfigProvider {
 
     private static final String CONFIG_FILE_NAME_KEY = "config.file.name";
     private static final String DEFAULT_JAAS_APP_NAME = "other";
