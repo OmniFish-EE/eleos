@@ -56,6 +56,7 @@ import javax.security.auth.message.module.ClientAuthModule;
 import javax.security.auth.message.module.ServerAuthModule;
 
 import org.glassfish.internal.api.Globals;
+import org.omnifaces.elios.config.factory.ConfigParser;
 import org.omnifaces.elios.services.AuthMessagePolicy;
 import org.omnifaces.elios.services.WebServicesDelegate;
 import org.omnifaces.enterprise.deployment.runtime.common.MessageSecurityBindingDescriptor;

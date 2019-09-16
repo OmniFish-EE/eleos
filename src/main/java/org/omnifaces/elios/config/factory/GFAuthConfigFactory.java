@@ -14,17 +14,15 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  */
 
-package org.omnifaces.elios.services.config;
+package org.omnifaces.elios.config.factory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
-import org.omnifaces.elios.config.factory.BaseAuthConfigFactory;
 import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
 import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
 import org.omnifaces.elios.services.WebServicesDelegate;
-import org.omnifaces.enterprise.security.SecurityServicesUtil;
+import org.omnifaces.elios.services.config.GFServerConfigProvider;
 
 /**
  * This class implements methods in the abstract class AuthConfigFactory.
@@ -91,10 +89,7 @@ public class GFAuthConfigFactory extends BaseAuthConfigFactory {
      */
     static List<AuthConfigProviderEntry> getDefaultProviders() {
         WebServicesDelegate delegate = null;
-        SecurityServicesUtil svcUtil = SecurityServicesUtil.getInstance();
-        if (svcUtil != null) {
-            delegate = svcUtil.getHabitat().getService(WebServicesDelegate.class);
-        }
+        
         if (delegate != null) {
             List<AuthConfigProviderEntry> entries = new ArrayList<AuthConfigProviderEntry>(2);
             entries.add(new AuthConfigProviderEntry(delegate.getDefaultWebServicesProvider(), null));
