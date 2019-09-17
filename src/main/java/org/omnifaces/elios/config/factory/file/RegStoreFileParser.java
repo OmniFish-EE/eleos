@@ -16,6 +16,12 @@
 
 package org.omnifaces.elios.config.factory.file;
 
+import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.WARNING;
+import static org.omnifaces.elios.config.helper.LogManager.JASPIC_LOGGER;
+import static org.omnifaces.elios.config.helper.LogManager.RES_BUNDLE;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -27,16 +33,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.omnifaces.elios.config.factory.RegistrationContextImpl;
-import org.omnifaces.elios.config.helper.JASPICLogManager;
 
 /**
- * Used by GFServerConfigProvider to parse the configuration file. If a file does not exist originally, the default
+ * Used by ServerConfigProvider to parse the configuration file. If a file does not exist originally, the default
  * providers are not used. A file is only created if needed, which happens if providers are registered or unregistered
  * through the store() or delete() methods.
  *
@@ -44,7 +48,7 @@ import org.omnifaces.elios.config.helper.JASPICLogManager;
  */
 public final class RegStoreFileParser {
 
-    private static final Logger logger = Logger.getLogger(JASPICLogManager.JASPIC_LOGGER, JASPICLogManager.RES_BUNDLE);
+    private static final Logger logger = Logger.getLogger(JASPIC_LOGGER, RES_BUNDLE);
 
     private static final String SEP = ":";
     private static final String CON_ENTRY = "con-entry";
@@ -55,53 +59,42 @@ public final class RegStoreFileParser {
     private static final String DESCRIPTION = "description";
     private static final String[] INDENT = { "", "  ", "    " };
 
-    private final File confFile;
-    private List<AuthConfigProviderEntry> entries;
-    private List<AuthConfigProviderEntry> defaultEntries;
+    private File configurationFile;
+    private List<AuthConfigProviderEntry> authConfigProviderEntries;
 
-    /*
-     * Loads the configuration file from the given filename. If a file is not found, then the default entries are used.
-     * Otherwise the file is parsed to load the entries.
+    public RegStoreFileParser(List<AuthConfigProviderEntry> authConfigProviderEntries) {
+        this.authConfigProviderEntries = new ArrayList<AuthConfigProviderEntry>(authConfigProviderEntries);
+    }
+
+    /**
+     * Loads the configuration file from the given filename. If a file is not found, then the default authConfigProviderEntries are used.
+     * Otherwise the file is parsed to load the authConfigProviderEntries.
      *
      */
     public RegStoreFileParser(String pathParent, String pathChild, List<AuthConfigProviderEntry> defaultEntries) {
-        confFile = new File(pathParent, pathChild);
-        this.defaultEntries = defaultEntries == null ? new ArrayList<AuthConfigProviderEntry>() : defaultEntries;
+        configurationFile = new File(pathParent, pathChild);
+
         try {
-            loadEntries();
-        } catch (IOException ioe) {
+            loadEntries(defaultEntries);
+        } catch (IOException | IllegalArgumentException ioe) {
             logWarningDefault(ioe);
-        } catch (IllegalArgumentException iae) {
-            logWarningDefault(iae);
         }
     }
 
-    private void logWarningUpdated(Exception exception) {
-        if (logger.isLoggable(Level.WARNING)) {
-            logger.log(Level.WARNING, "jmac.factory_could_not_persist", exception.toString());
-        }
-    }
-
-    private void logWarningDefault(Exception exception) {
-        if (logger.isLoggable(Level.WARNING)) {
-            logger.log(Level.WARNING, "jmac.factory_could_not_read", exception.toString());
-        }
-    }
-
-    /*
-     * Returns the in-memory list of entries. MUST Hold exclusive lock on calling factory while processing entries
+    /**
+     * Returns the in-memory list of authConfigProviderEntries. MUST Hold exclusive lock on calling factory while processing authConfigProviderEntries
      */
     public List<AuthConfigProviderEntry> getPersistedEntries() {
-        return entries;
+        return authConfigProviderEntries;
     }
 
-    /*
+    /**
      * Adds the provider to the entry list if it is not already present, creates the configuration file if necessary, and
-     * writes the entries to the file.
+     * writes the authConfigProviderEntries to the file.
      */
-    public void store(String className, RegistrationContext ctx, Map properties) {
-        synchronized (confFile) {
-            if (checkAndAddToList(className, ctx, properties)) {
+    public void store(String className, RegistrationContext registrationContext, Map<String, String> properties) {
+        synchronized (configurationFile) {
+            if (checkAndAddToList(className, registrationContext, properties)) {
                 try {
                     writeEntries();
                 } catch (IOException ioe) {
@@ -111,13 +104,13 @@ public final class RegStoreFileParser {
         }
     }
 
-    /*
+    /**
      * Removes the provider from the entry list if it is already present, creates the configuration file if necessary, and
-     * writes the entries to the file.
+     * writes the authConfigProviderEntries to the file.
      */
-    public void delete(RegistrationContext ctx) {
-        synchronized (confFile) {
-            if (checkAndRemoveFromList(ctx)) {
+    public void delete(RegistrationContext registrationContext) {
+        synchronized (configurationFile) {
+            if (checkAndRemoveFromList(registrationContext)) {
                 try {
                     writeEntries();
                 } catch (IOException ioe) {
@@ -127,45 +120,47 @@ public final class RegStoreFileParser {
         }
     }
 
-    /*
-     * If this entry does not exist, this method stores it in the entries list and returns true to indicate that the
+    /**
+     * If this entry does not exist, this method stores it in the authConfigProviderEntries list and returns true to indicate that the
      * configuration file should be written.
      */
-    private boolean checkAndAddToList(String className, RegistrationContext ctx, Map props) {
+    private boolean checkAndAddToList(String className, RegistrationContext registrationContext, Map<String, String> properties) {
 
-        // convention is to use null for empty properties
-        if (props != null && props.isEmpty()) {
-            props = null;
+        // Convention is to use null for empty properties
+        if (properties != null && properties.isEmpty()) {
+            properties = null;
         }
-        AuthConfigProviderEntry newEntry = new AuthConfigProviderEntry(className, props, ctx);
-        AuthConfigProviderEntry entry = getMatchingRegEntry(newEntry);
 
-        // there is no matching entry, so add to list
+        AuthConfigProviderEntry newEntry = new AuthConfigProviderEntry(className, properties, registrationContext);
+        AuthConfigProviderEntry entry = getMatchingRegistrationEntry(newEntry);
+
+        // There is no matching entry, so add to list
         if (entry == null) {
-            entries.add(newEntry);
+            authConfigProviderEntries.add(newEntry);
             return true;
         }
 
-        // otherwise, check reg contexts to see if there is a match
-        if (entry.getRegContexts().contains(ctx)) {
+        // Otherwise, check reg contexts to see if there is a match
+        if (entry.getRegistrationContexts().contains(registrationContext)) {
             return false;
         }
 
-        // no matching context in existing entry, so add to existing entry
-        entry.getRegContexts().add(new RegistrationContextImpl(ctx));
+        // No matching context in existing entry, so add to existing entry
+        entry.getRegistrationContexts().add(new RegistrationContextImpl(registrationContext));
+
         return true;
     }
 
-    /*
+    /**
      * If this registration context does not exist, this method returns false. Otherwise it removes the entry and returns
      * true to indicate that the configuration file should be written.
      *
-     * This only makes sense for registry entries.
+     * This only makes sense for registry authConfigProviderEntries.
      */
     private boolean checkAndRemoveFromList(RegistrationContext target) {
         boolean retValue = false;
         try {
-            ListIterator<AuthConfigProviderEntry> lit = entries.listIterator();
+            ListIterator<AuthConfigProviderEntry> lit = authConfigProviderEntries.listIterator();
             while (lit.hasNext()) {
 
                 AuthConfigProviderEntry info = lit.next();
@@ -173,12 +168,12 @@ public final class RegStoreFileParser {
                     continue;
                 }
 
-                Iterator<RegistrationContext> iter = info.getRegContexts().iterator();
+                Iterator<RegistrationContext> iter = info.getRegistrationContexts().iterator();
                 while (iter.hasNext()) {
                     RegistrationContext ctx = iter.next();
                     if (ctx.equals(target)) {
                         iter.remove();
-                        if (info.getRegContexts().isEmpty()) {
+                        if (info.getRegistrationContexts().isEmpty()) {
                             lit.remove();
                         }
                         retValue = true;
@@ -188,33 +183,37 @@ public final class RegStoreFileParser {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+
         return retValue;
     }
 
-    /*
-     * Used to find a matching registration entry in the 'entries' list without including registration contexts. If there is
+    /**
+     * Used to find a matching registration entry in the 'authConfigProviderEntries' list without including registration contexts. If there is
      * not a matching entry, return null.
      */
-    private AuthConfigProviderEntry getMatchingRegEntry(AuthConfigProviderEntry target) {
-        for (AuthConfigProviderEntry info : entries) {
+    private AuthConfigProviderEntry getMatchingRegistrationEntry(AuthConfigProviderEntry target) {
+        for (AuthConfigProviderEntry info : authConfigProviderEntries) {
             if (!info.isConstructorEntry() && info.matchConstructors(target)) {
                 return info;
             }
         }
+
         return null;
     }
 
-    /*
-     * This method overwrites the existing file with the current entries.
+    /**
+     * This method overwrites the existing file with the current authConfigProviderEntries.
      */
     private void writeEntries() throws IOException {
-        if (confFile.exists() && !confFile.canWrite() && logger.isLoggable(Level.WARNING)) {
-            logger.log(Level.WARNING, "jmac.factory_cannot_write_file", confFile.getPath());
+        if (configurationFile.exists() && !configurationFile.canWrite() && logger.isLoggable(WARNING)) {
+            logger.log(WARNING, "jaspic.factory_cannot_write_file", configurationFile.getPath());
         }
+
         clearExistingFile();
-        PrintWriter out = new PrintWriter(confFile);
+
+        PrintWriter out = new PrintWriter(configurationFile);
         int indent = 0;
-        for (AuthConfigProviderEntry info : entries) {
+        for (AuthConfigProviderEntry info : authConfigProviderEntries) {
             if (info.isConstructorEntry()) {
                 writeConEntry(info, out, indent);
             } else {
@@ -224,111 +223,128 @@ public final class RegStoreFileParser {
         out.close();
     }
 
-    /*
-     * Writes constructor entry output of the form: <pre> con-entry { className key:value key:value } </pre> The first
-     * appearance of a colon ":" separates the key and value of the property (so a value may contain a colon as part of the
-     * string). For instance: "mydir:c:foo" would have key "mydir" and value "c:foo".
+    /**
+     * Writes constructor entry output of the form:
+     *
+     * <pre>
+     *  con-entry { className key:value key:value }
+     * </pre>
+     *
+     * The first appearance of a colon ":" separates the key and value of the property (so a value may contain a colon as
+     * part of the string). For instance: "mydir:c:foo" would have key "mydir" and value "c:foo".
      */
     private void writeConEntry(AuthConfigProviderEntry info, PrintWriter out, int i) {
         out.println(INDENT[i++] + CON_ENTRY + " {");
         out.println(INDENT[i] + info.getClassName());
-        Map<String, String> props = info.getProperties();
-        if (props != null) {
-            for (Map.Entry<String, String> val : props.entrySet()) {
+
+        Map<String, String> properties = info.getProperties();
+        if (properties != null) {
+            for (Map.Entry<String, String> val : properties.entrySet()) {
                 out.println(INDENT[i] + val.getKey() + SEP + val.getValue());
             }
         }
+
         out.println(INDENT[--i] + "}");
     }
 
     /*
      * Write registration entry output of the form: <pre> reg-entry { con-entry { see writeConEntry() for detail } reg-ctx {
-     * layer:HttpServlet app-ctx:security-jmac-https description:My provider } } </pre>
+     * layer:HttpServlet app-ctx:security-jaspic-https description:My provider } } </pre>
      */
     private void writeRegEntry(AuthConfigProviderEntry info, PrintWriter out, int i) {
         out.println(INDENT[i++] + REG_ENTRY + " {");
         if (info.getClassName() != null) {
             writeConEntry(info, out, i);
         }
-        for (RegistrationContext ctx : info.getRegContexts()) {
+
+        for (RegistrationContext registrationContext : info.getRegistrationContexts()) {
             out.println(INDENT[i++] + REG_CTX + " {");
-            if (ctx.getMessageLayer() != null) {
-                out.println(INDENT[i] + LAYER + SEP + ctx.getMessageLayer());
+            if (registrationContext.getMessageLayer() != null) {
+                out.println(INDENT[i] + LAYER + SEP + registrationContext.getMessageLayer());
             }
-            if (ctx.getAppContext() != null) {
-                out.println(INDENT[i] + APP_CTX + SEP + ctx.getAppContext());
+
+            if (registrationContext.getAppContext() != null) {
+                out.println(INDENT[i] + APP_CTX + SEP + registrationContext.getAppContext());
             }
-            if (ctx.getDescription() != null) {
-                out.println(INDENT[i] + DESCRIPTION + SEP + ctx.getDescription());
+
+            if (registrationContext.getDescription() != null) {
+                out.println(INDENT[i] + DESCRIPTION + SEP + registrationContext.getDescription());
             }
+
             out.println(INDENT[--i] + "}");
         }
+
         out.println(INDENT[--i] + "}");
     }
 
     private void clearExistingFile() throws IOException {
-        boolean newCreation = !confFile.exists();
+        boolean newCreation = !configurationFile.exists();
+
         if (!newCreation) {
-            if (!confFile.delete()) {
+            if (!configurationFile.delete()) {
                 throw new IOException();
             }
         }
+
         if (newCreation) {
-            logger.log(Level.INFO, "jmac.factory_creating_conf_file", confFile.getPath());
+            logger.log(INFO, "jaspic.factory_creating_conf_file", configurationFile.getPath());
         }
-        if (!confFile.createNewFile()) {
+
+        if (!configurationFile.createNewFile()) {
             throw new IOException();
         }
     }
 
-    /*
-     * Called from the constructor. This is the only time the file is read, though it is written when new entries are stored
+    /**
+     * Called from the constructor. This is the only time the file is read, though it is written when new authConfigProviderEntries are stored
      * or deleted.
      */
-    private void loadEntries() throws IOException {
-        synchronized (confFile) {
-            entries = new ArrayList<AuthConfigProviderEntry>();
-            if (confFile.exists()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(confFile))) {
+    private void loadEntries(List<AuthConfigProviderEntry> defaultAuthConfigProviderEntries) throws IOException {
+        synchronized (configurationFile) {
+            authConfigProviderEntries = new ArrayList<AuthConfigProviderEntry>();
+            if (configurationFile.exists()) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(configurationFile))) {
                     String line = reader.readLine();
                     while (line != null) {
                         String trimLine = line.trim(); // can't trim readLine() result
                         if (trimLine.startsWith(CON_ENTRY)) {
-                            entries.add(readConEntry(reader));
+                            authConfigProviderEntries.add(readConEntry(reader));
                         } else if (trimLine.startsWith(REG_ENTRY)) {
-                            entries.add(readRegEntry(reader));
+                            authConfigProviderEntries.add(readRegEntry(reader));
                         }
                         line = reader.readLine();
                     }
                 }
             } else {
-                if (logger.isLoggable(Level.FINER)) {
-                    logger.log(Level.FINER, "jmac.factory_file_not_found", confFile.getParent() + File.pathSeparator + confFile.getPath());
-
+                if (logger.isLoggable(FINER)) {
+                    logger.log(FINER, "jaspic.factory_file_not_found",
+                            configurationFile.getParent() + File.pathSeparator + configurationFile.getPath());
                 }
-                for (AuthConfigProviderEntry e : defaultEntries) {
-                    entries.add(new AuthConfigProviderEntry(e));
+
+                if (defaultAuthConfigProviderEntries != null) {
+                    for (AuthConfigProviderEntry entry : defaultAuthConfigProviderEntries) {
+                        authConfigProviderEntries.add(new AuthConfigProviderEntry(entry));
+                    }
                 }
             }
         }
     }
 
     private AuthConfigProviderEntry readConEntry(BufferedReader reader) throws IOException {
-        // entry must contain class name as next line
+        // AuthModuleBaseConfig must contain class name as next line
         String className = reader.readLine();
         if (className != null) {
             className = className.trim();
         }
-        Map<String, String> properties = readProperties(reader);
-        return new AuthConfigProviderEntry(className, properties);
+
+        return new AuthConfigProviderEntry(className, readProperties(reader));
     }
 
-    /*
+    /**
      * Properties must be of the form "key:value." While the key String cannot contain a ":" character, the value can. The
      * line will be broken into key and value based on the first appearance of the ":" character.
      */
     private Map<String, String> readProperties(BufferedReader reader) throws IOException {
-
         String line = reader.readLine();
         if (line != null) {
             line = line.trim();
@@ -337,6 +353,7 @@ public final class RegStoreFileParser {
         if ("}".equals(line)) {
             return null;
         }
+
         Map<String, String> properties = new HashMap<String, String>();
         while (!"}".equals(line)) {
             properties.put(line.substring(0, line.indexOf(SEP)), line.substring(line.indexOf(SEP) + 1, line.length()));
@@ -345,6 +362,7 @@ public final class RegStoreFileParser {
                 line = line.trim();
             }
         }
+
         return properties;
     }
 
@@ -374,7 +392,6 @@ public final class RegStoreFileParser {
     }
 
     private RegistrationContext readRegContext(BufferedReader reader) throws IOException {
-
         String layer = null;
         String appCtx = null;
         String description = null;
@@ -382,6 +399,7 @@ public final class RegStoreFileParser {
         if (line != null) {
             line = line.trim();
         }
+
         while (!"}".equals(line)) {
             String value = line.substring(line.indexOf(SEP) + 1, line.length());
             if (line.startsWith(LAYER)) {
@@ -391,12 +409,26 @@ public final class RegStoreFileParser {
             } else if (line.startsWith(DESCRIPTION)) {
                 description = value;
             }
+
             line = reader.readLine();
             if (line != null) {
                 line = line.trim();
             }
         }
+
         return new RegistrationContextImpl(layer, appCtx, description, true);
+    }
+
+    private void logWarningUpdated(Exception exception) {
+        if (logger.isLoggable(WARNING)) {
+            logger.log(WARNING, "jaspic.factory_could_not_persist", exception.toString());
+        }
+    }
+
+    private void logWarningDefault(Exception exception) {
+        if (logger.isLoggable(WARNING)) {
+            logger.log(WARNING, "jaspic.factory_could_not_read", exception.toString());
+        }
     }
 
 }

@@ -16,21 +16,25 @@
 
 package org.omnifaces.elios.config.helper;
 
+import static java.security.AccessController.doPrivileged;
 import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.WARNING;
 import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.OPTIONAL;
+import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.REQUIRED;
 import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.REQUISITE;
 import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.SUFFICIENT;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.security.AccessController;
 import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.logging.Level;
 
 import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag;
@@ -48,27 +52,216 @@ public class JAASModulesManager extends ModulesManager {
     private static final String DEFAULT_ENTRY_NAME = "other";
     private static final Class<?>[] PARAMS = {};
     private static final Object[] ARGS = {};
-    
+
+    private LogManager logManager;
+
     private ExtendedConfigFile jaasConfig;
-    
+
     private final String appContext;
 
     // may be more than one delegate for a given jaas config file
     private ReentrantReadWriteLock instanceReadWriteLock = new ReentrantReadWriteLock();
-    
+
     private Lock instanceWriteLock = instanceReadWriteLock.writeLock();
-    
+
     private AppConfigurationEntry[] appConfigurationEntry;
-    
+
     private Constructor<?>[] loginModuleConstructors;
 
-    public JAASModulesManager(String loggerName, boolean returnNullContexts, ExtendedConfigFile jaasConfig, Map properties, String appContext)
-            throws AuthException {
-        super(loggerName, returnNullContexts);
+    public JAASModulesManager(LogManager logManager, boolean returnNullContexts, ExtendedConfigFile jaasConfig, Map<String, ?> properties, String appContext) throws AuthException {
+        super(returnNullContexts);
+
+        this.logManager = logManager;
         this.jaasConfig = jaasConfig;
         this.appContext = appContext;
+
         initialize();
     }
+
+    @Override
+    public Map<String, ?> getInitProperties(int i, Map<String, ?> properties) {
+        Map<String, Object> initProperties = new HashMap<String, Object>();
+
+        if (appConfigurationEntry[i] != null) {
+            if (properties != null && !properties.isEmpty()) {
+                initProperties.putAll(properties);
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> options = (Map<String, Object>) appConfigurationEntry[i].getOptions();
+            if (options != null && !options.isEmpty()) {
+                initProperties.putAll(options);
+            }
+        }
+
+        return initProperties;
+    }
+
+    @Override
+    public
+    final void refresh() {
+        jaasConfig.refresh();
+        initialize();
+    }
+
+    /**
+     * This implementation does not depend on authContextID
+     *
+     * @param <M>
+     * @param template
+     * @param authContextID (ignored by this context system)
+     * @return
+     * @throws AuthException
+     */
+    @Override
+    public <M> boolean hasModules(M[] template, String authContextID) throws AuthException {
+        loadConstructors(template, authContextID);
+
+        for (Constructor<?> constructor : loginModuleConstructors) {
+            if (constructor != null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * this implementation does not depend on authContextID
+     *
+     * @param <M>
+     * @param template
+     * @param authContextID (ignored by this context system)
+     * @return
+     * @throws AuthException
+     */
+    @Override
+    public <M> M[] getModules(M[] template, String authContextID) throws AuthException {
+        loadConstructors(template, authContextID);
+
+        List<M> moduleInstances = new ArrayList<M>(loginModuleConstructors.length);
+
+        for (int moduleNumber = 0; moduleNumber < loginModuleConstructors.length; moduleNumber++) {
+            if (loginModuleConstructors[moduleNumber] == null) {
+                moduleInstances.add(moduleNumber, null);
+            } else {
+                int j = moduleNumber;
+                try {
+                    moduleInstances.add(j, doPrivileged(new PrivilegedExceptionAction<M>() {
+
+                        @Override
+                        @SuppressWarnings("unchecked")
+                        public M run() throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+                            return (M) loginModuleConstructors[j].newInstance(ARGS);
+                        }
+                    }));
+                } catch (PrivilegedActionException pae) {
+                    throw (AuthException) new AuthException().initCause(pae.getCause());
+                }
+            }
+        }
+
+        return moduleInstances.toArray(template);
+    }
+
+    @Override
+    public boolean shouldStopProcessingModules(AuthStatus[] successValue, int moduleNumber, AuthStatus moduleStatus) {
+        if (appConfigurationEntry[moduleNumber] != null && loginModuleConstructors[moduleNumber] != null) {
+            LoginModuleControlFlag flag = appConfigurationEntry[moduleNumber].getControlFlag();
+
+            if (REQUISITE.equals(flag)) {
+                for (AuthStatus authStatus : successValue) {
+                    if (moduleStatus == authStatus) {
+                        return false;
+                    }
+                }
+
+                return true;
+            } else if (SUFFICIENT.equals(flag)) {
+                for (AuthStatus authStatus : successValue) {
+                    if (moduleStatus == authStatus) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public AuthStatus getReturnStatus(AuthStatus[] successValue, AuthStatus defaultFailStatus, AuthStatus[] status, int position) {
+        AuthStatus returnStatus = null;
+
+        for (int moduleNumber = 0; moduleNumber <= position; moduleNumber++) {
+            if (appConfigurationEntry[moduleNumber] != null && loginModuleConstructors[moduleNumber] != null) {
+
+                LoginModuleControlFlag flag = appConfigurationEntry[moduleNumber].getControlFlag();
+
+                if (logManager.isLoggable(FINE)) {
+                    logManager.logIfLevel(FINE, null, "getReturnStatus - flag: ", flag.toString());
+                }
+
+                if (flag == REQUIRED || flag == REQUISITE) {
+                    boolean isSuccessValue = false;
+                    for (AuthStatus authStatus : successValue) {
+                        if (status[moduleNumber] == authStatus) {
+                            isSuccessValue = true;
+                        }
+                    }
+
+                    if (isSuccessValue) {
+                        if (returnStatus == null) {
+                            returnStatus = status[moduleNumber];
+                        }
+                        continue;
+                    }
+
+                    if (logManager.isLoggable(FINE)) {
+                        logManager.logIfLevel(FINE, null, "ReturnStatus - REQUIRED or REQUISITE failure: ", status[moduleNumber].toString());
+                    }
+                    return status[moduleNumber];
+                } else if (flag == SUFFICIENT) {
+                    if (shouldStopProcessingModules(successValue, moduleNumber, status[moduleNumber])) {
+                        if (logManager.isLoggable(FINE)) {
+                            logManager.logIfLevel(FINE, null, "ReturnStatus - Sufficient success: ", status[moduleNumber].toString());
+                        }
+
+                        return status[moduleNumber];
+                    }
+
+                } else if (flag == OPTIONAL) {
+                    if (returnStatus == null) {
+                        for (AuthStatus authStatus : successValue) {
+                            if (status[moduleNumber] == authStatus) {
+                                returnStatus = status[moduleNumber];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (returnStatus != null) {
+            if (logManager.isLoggable(FINE)) {
+                logManager.logIfLevel(FINE, null, "ReturnStatus - result: ", returnStatus.toString());
+            }
+
+            return returnStatus;
+        }
+
+        if (logManager.isLoggable(FINE)) {
+            logManager.logIfLevel(FINE, null, "ReturnStatus - Default faiure status: ", defaultFailStatus.toString());
+        }
+
+        return defaultFailStatus;
+    }
+
+
+
+    // ### Private methods
 
     private void initialize() {
         boolean found = false;
@@ -77,6 +270,7 @@ public class JAASModulesManager extends ModulesManager {
         try {
             appConfigurationEntry = jaasConfig.getAppConfigurationEntry(appContext);
             if (appConfigurationEntry == null) {
+
                 // NEED TO MAKE SURE THIS LOOKUP only occurs when registered for *
                 appConfigurationEntry = jaasConfig.getAppConfigurationEntry(DEFAULT_ENTRY_NAME);
                 if (appConfigurationEntry == null) {
@@ -87,209 +281,52 @@ public class JAASModulesManager extends ModulesManager {
             } else {
                 found = true;
             }
-            // initializeContextMap();
             loginModuleConstructors = null;
         } finally {
             instanceWriteLock.unlock();
         }
+
         if (!found) {
             if (!foundDefault) {
-                logIfLevel(Level.INFO, null, "JAASAuthConfig no entries matched appContext (", appContext, ") or (", DEFAULT_ENTRY_NAME, ")");
+                logManager.logIfLevel(INFO, null, "JAASModulesManager no entries matched appContext (", appContext, ") or (", DEFAULT_ENTRY_NAME,
+                        ")");
             } else {
-                logIfLevel(Level.INFO, null, "JAASAuthConfig appContext (", appContext, ") matched (", DEFAULT_ENTRY_NAME, ")");
+                logManager.logIfLevel(INFO, null, "JAASModulesManager appContext (", appContext, ") matched (", DEFAULT_ENTRY_NAME, ")");
             }
         }
     }
+
 
     private <M> void loadConstructors(M[] template, String authContextID) throws AuthException {
         if (loginModuleConstructors == null) {
             try {
-                final Class moduleType = template.getClass().getComponentType();
-                loginModuleConstructors = (Constructor[]) AccessController.doPrivileged(new java.security.PrivilegedExceptionAction() {
+                Class<?> moduleType = template.getClass().getComponentType();
+                loginModuleConstructors = doPrivileged(new PrivilegedExceptionAction<Constructor<?>[]>() {
 
                     @Override
-                    public Object run() throws ClassNotFoundException, NoSuchMethodException, InstantiationException,
-                            IllegalAccessException, InvocationTargetException {
-                        Constructor[] ctor = new Constructor[appConfigurationEntry.length];
+                    public Constructor<?>[] run() throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
+
+                        Constructor<?>[] loginModuleCtors = new Constructor[appConfigurationEntry.length];
                         ClassLoader loader = Thread.currentThread().getContextClassLoader();
+
                         for (int i = 0; i < appConfigurationEntry.length; i++) {
-                            ctor[i] = null;
-                            String clazz = appConfigurationEntry[i].getLoginModuleName();
+                            String loginModuleName = appConfigurationEntry[i].getLoginModuleName();
                             try {
-                                Class c = Class.forName(clazz, true, loader);
-                                if (moduleType.isAssignableFrom(c)) {
-                                    ctor[i] = c.getConstructor(PARAMS);
+                                Class<?> loginModuleClass = Class.forName(loginModuleName, true, loader);
+                                if (moduleType.isAssignableFrom(loginModuleClass)) {
+                                    loginModuleCtors[i] = loginModuleClass.getConstructor(PARAMS);
                                 }
 
                             } catch (Throwable t) {
-                                logIfLevel(Level.WARNING, null, "skipping unloadable class: ", clazz, " of appCOntext: ", appContext);
+                                logManager.logIfLevel(WARNING, null, "skipping unloadable class: ", loginModuleName, " of appCOntext: ", appContext);
                             }
                         }
-                        return ctor;
+                        return loginModuleCtors;
                     }
                 });
             } catch (PrivilegedActionException pae) {
-                AuthException ae = new AuthException();
-                ae.initCause(pae.getCause());
-                throw ae;
+                throw (AuthException) new AuthException().initCause(pae.getCause());
             }
         }
-    }
-
-    @Override
-    public final void refresh() {
-        jaasConfig.refresh();
-        initialize();
-    }
-
-    /**
-     * this implementation does not depend on authContextID
-     * 
-     * @param <M>
-     * @param template
-     * @param authContextID (ignored by this context system)
-     * @return
-     * @throws AuthException
-     */
-    @Override
-    public <M> boolean hasModules(M[] template, String authContextID) throws AuthException {
-        loadConstructors(template, authContextID);
-        for (Constructor c : loginModuleConstructors) {
-            if (c != null) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * this implementation does not depend on authContextID
-     * 
-     * @param <M>
-     * @param template
-     * @param authContextID (ignored by this context system)
-     * @return
-     * @throws AuthException
-     */
-    @Override
-    public <M> M[] getModules(M[] template, String authContextID) throws AuthException {
-        loadConstructors(template, authContextID);
-        ArrayList<M> list = new ArrayList<M>();
-        for (int i = 0; i < loginModuleConstructors.length; i++) {
-            if (loginModuleConstructors[i] == null) {
-                list.add(i, null);
-            } else {
-                final int j = i;
-                try {
-                    list.add(j, AccessController.doPrivileged(new java.security.PrivilegedExceptionAction<M>() {
-
-                        @Override
-                        public M run() throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-                            return (M) loginModuleConstructors[j].newInstance(ARGS);
-                        }
-                    }));
-                } catch (PrivilegedActionException pae) {
-                    AuthException ae = new AuthException();
-                    ae.initCause(pae.getCause());
-                    throw ae;
-                }
-            }
-        }
-        return list.toArray(template);
-    }
-
-    @Override
-    public Map<String, ?> getInitProperties(int i, Map<String, ?> properties) {
-        Map<String, Object> rvalue = new HashMap<String, Object>();
-        if (appConfigurationEntry[i] != null) {
-            if (properties != null && !properties.isEmpty()) {
-                rvalue.putAll(properties);
-            }
-            Map<String, Object> options = (Map<String, Object>) appConfigurationEntry[i].getOptions();
-            if (options != null && !options.isEmpty()) {
-                rvalue.putAll(options);
-            }
-        }
-        return rvalue;
-    }
-
-    @Override
-    public boolean exitContext(AuthStatus[] successValue, int i, AuthStatus moduleStatus) {
-        if (appConfigurationEntry[i] != null && loginModuleConstructors[i] != null) {
-            LoginModuleControlFlag flag = appConfigurationEntry[i].getControlFlag();
-            if (REQUISITE.equals(flag)) {
-                for (AuthStatus s : successValue) {
-                    if (moduleStatus == s) {
-                        return false;
-                    }
-                }
-                return true;
-            } else if (SUFFICIENT.equals(flag)) {
-                for (AuthStatus s : successValue) {
-                    if (moduleStatus == s) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public AuthStatus getReturnStatus(AuthStatus[] successValue, AuthStatus defaultFailStatus, AuthStatus[] status, int position) {
-        AuthStatus result = null;
-        for (int i = 0; i <= position; i++) {
-            if (appConfigurationEntry[i] != null && loginModuleConstructors[i] != null) {
-                LoginModuleControlFlag flag = appConfigurationEntry[i].getControlFlag();
-                if (isLoggable(FINE)) {
-                    logIfLevel(FINE, null, "getReturnStatus - flag: ", flag.toString());
-                }
-                if (flag == LoginModuleControlFlag.REQUIRED || flag == REQUISITE) {
-                    boolean isSuccessValue = false;
-                    for (AuthStatus s : successValue) {
-                        if (status[i] == s) {
-                            isSuccessValue = true;
-                        }
-                    }
-                    if (isSuccessValue) {
-                        if (result == null) {
-                            result = status[i];
-                        }
-                        continue;
-                    }
-                    if (isLoggable(FINE)) {
-                        logIfLevel(FINE, null, "ReturnStatus - REQUIRED or REQUISITE failure: ", status[i].toString());
-                    }
-                    return status[i];
-                } else if (flag == SUFFICIENT) {
-                    if (exitContext(successValue, i, status[i])) {
-                        if (isLoggable(FINE)) {
-                            logIfLevel(FINE, null, "ReturnStatus - Sufficient success: ", status[i].toString());
-                        }
-                        return status[i];
-                    }
-
-                } else if (flag == OPTIONAL) {
-                    if (result == null) {
-                        for (AuthStatus s : successValue) {
-                            if (status[i] == s) {
-                                result = status[i];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (result != null) {
-            if (isLoggable(FINE)) {
-                logIfLevel(FINE, null, "ReturnStatus - result: ", result.toString());
-            }
-            return result;
-        }
-        if (isLoggable(FINE)) {
-            logIfLevel(FINE, null, "ReturnStatus - Default faiure status: ", defaultFailStatus.toString());
-        }
-        return defaultFailStatus;
     }
 }

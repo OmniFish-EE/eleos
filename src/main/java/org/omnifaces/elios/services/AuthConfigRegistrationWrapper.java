@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 1997, 2018 Oracle and/or its affiliates. All rights reserved.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License v. 2.0, which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * This Source Code may also be made available under the following Secondary
+ * Licenses when the conditions for such availability set forth in the
+ * Eclipse Public License v. 2.0 are satisfied: GNU General Public License,
+ * version 2 with the GNU Classpath Exception, which is available at
+ * https://www.gnu.org/software/classpath/license.html.
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+ */
+
 package org.omnifaces.elios.services;
 
 import java.util.concurrent.locks.Lock;
@@ -9,24 +25,27 @@ import javax.security.auth.message.config.RegistrationListener;
 public class AuthConfigRegistrationWrapper {
 
     private String layer;
-    private String appCtxt;
-    private String jmacProviderRegisID = null;
+    private String applicationContextId;
+    private String jaspicProviderRegistrationId;
     private boolean enabled;
     private ConfigData data;
 
     private Lock wLock;
     private ReadWriteLock rwLock;
 
-    AuthConfigRegistrationListener listener;
-    int referenceCount = 1;
+    private AuthConfigRegistrationListener listener;
+    private int referenceCount = 1;
+    private RegistrationWrapperRemover removerDelegate;
 
-    public AuthConfigRegistrationWrapper(String layer, String appCtxt) {
+    public AuthConfigRegistrationWrapper(String layer, String applicationContextId, RegistrationWrapperRemover removerDelegate) {
         this.layer = layer;
-        this.appCtxt = appCtxt;
+        this.applicationContextId = applicationContextId;
+        this.removerDelegate = removerDelegate;
         this.rwLock = new ReentrantReadWriteLock(true);
         this.wLock = rwLock.writeLock();
-        enabled = (factory != null);
-        listener = new AuthConfigRegistrationListener(layer, appCtxt);
+
+        enabled = BaseAuthenticationService.factory != null;
+        listener = new AuthConfigRegistrationListener(layer, applicationContextId);
     }
 
     public AuthConfigRegistrationListener getListener() {
@@ -39,29 +58,29 @@ public class AuthConfigRegistrationWrapper {
 
     public void disable() {
         this.wLock.lock();
+
         try {
             setEnabled(false);
         } finally {
             this.wLock.unlock();
             data = null;
         }
-        if (factory != null) {
-            String[] ids = factory.detachListener(this.listener, layer, appCtxt);
-//                if (ids != null) {
-//                    for (int i=0; i < ids.length; i++) {
-//                        factory.removeRegistration(ids[i]);
-//                    }
-//                }
-            if (getJmacProviderRegisID() != null) {
-                factory.removeRegistration(getJmacProviderRegisID());
+
+        if (BaseAuthenticationService.factory != null) {
+            BaseAuthenticationService.factory.detachListener(this.listener, layer, applicationContextId);
+            if (getJaspicProviderRegistrationId() != null) {
+                BaseAuthenticationService.factory.removeRegistration(getJaspicProviderRegistrationId());
             }
         }
     }
 
-    // detach the listener, but dont remove-registration
+    // Detach the listener, but don't remove-registration
     public void disableWithRefCount() {
         if (referenceCount <= 1) {
             disable();
+            if (removerDelegate != null) {
+                removerDelegate.removeListener(this);
+            }
         } else {
             try {
                 this.wLock.lock();
@@ -90,22 +109,22 @@ public class AuthConfigRegistrationWrapper {
         this.enabled = enabled;
     }
 
-    public String getJmacProviderRegisID() {
-        return this.jmacProviderRegisID;
+    public String getJaspicProviderRegistrationId() {
+        return this.jaspicProviderRegistrationId;
     }
 
-    public void setJmacProviderRegisID(String jmacProviderRegisID) {
-        this.jmacProviderRegisID = jmacProviderRegisID;
+    public void setRegistrationId(String jaspicProviderRegistrationId) {
+        this.jaspicProviderRegistrationId = jaspicProviderRegistrationId;
     }
 
-    ConfigData getConfigData() {
+    public ConfigData getConfigData() {
         return data;
     }
 
-    void setConfigData(ConfigData data) {
+    public void setConfigData(ConfigData data) {
         this.data = data;
     }
-    
+
     public class AuthConfigRegistrationListener implements RegistrationListener {
 
         private String layer;
@@ -116,8 +135,10 @@ public class AuthConfigRegistrationWrapper {
             this.appCtxt = appCtxt;
         }
 
+        @Override
         public void notify(String layer, String appContext) {
-            if (this.layer.equals(layer) && ((this.appCtxt == null && appContext == null) || (appContext != null && appContext.equals(this.appCtxt)))) {
+            if (this.layer.equals(layer)
+                    && ((this.appCtxt == null && appContext == null) || (appContext != null && appContext.equals(this.appCtxt)))) {
                 try {
                     wLock.lock();
                     data = null;
@@ -128,5 +149,4 @@ public class AuthConfigRegistrationWrapper {
         }
 
     }
-
 }

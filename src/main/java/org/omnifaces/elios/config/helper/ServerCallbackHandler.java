@@ -25,7 +25,6 @@ package org.omnifaces.elios.config.helper;
 import java.io.IOException;
 
 import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.*;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.message.callback.CallerPrincipalCallback;
 import javax.security.auth.message.callback.CertStoreCallback;
@@ -40,6 +39,7 @@ import javax.security.auth.message.callback.TrustStoreCallback;
  * 
  * @author Harpreet Singh
  * @author Shing Wai Chan
+ * @author Arjan Tijms
  */
 final class ServerCallbackHandler extends BaseCallbackHandler {
 
@@ -47,19 +47,18 @@ final class ServerCallbackHandler extends BaseCallbackHandler {
     }
 
     protected void handleSupportedCallbacks(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
-        for (int i = 0; i < callbacks.length; i++) {
-            processCallback(callbacks[i]);
+        for (Callback callback : callbacks) {
+            processCallback(callback);
         }
     }
 
     protected boolean isSupportedCallback(Callback callback) {
-        boolean isSupported = false;
-        if (callback instanceof CertStoreCallback || callback instanceof PasswordValidationCallback || callback instanceof CallerPrincipalCallback
-                || callback instanceof GroupPrincipalCallback || callback instanceof SecretKeyCallback || callback instanceof PrivateKeyCallback
-                || callback instanceof TrustStoreCallback) {
-
-            isSupported = true;
-        }
-        return isSupported;
+        return callback instanceof CertStoreCallback 
+                || callback instanceof PasswordValidationCallback
+                || callback instanceof CallerPrincipalCallback 
+                || callback instanceof GroupPrincipalCallback
+                || callback instanceof SecretKeyCallback 
+                || callback instanceof PrivateKeyCallback
+                || callback instanceof TrustStoreCallback; 
     }
 }

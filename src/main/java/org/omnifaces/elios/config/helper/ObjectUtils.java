@@ -18,6 +18,7 @@ package org.omnifaces.elios.config.helper;
 
 import static java.security.AccessController.doPrivileged;
 import static java.util.logging.Level.WARNING;
+import static org.omnifaces.elios.config.helper.ObjectUtils.createObject;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -29,7 +30,6 @@ import java.util.logging.Logger;
 import javax.security.auth.message.AuthException;
 
 import org.omnifaces.elios.config.factory.ConfigParser;
-
 
 public class ObjectUtils {
 
@@ -111,5 +111,6 @@ public class ObjectUtils {
             }
         });
     }
+
 
 }

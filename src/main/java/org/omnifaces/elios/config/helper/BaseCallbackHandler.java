@@ -79,12 +79,28 @@ public abstract class BaseCallbackHandler implements CallbackHandler {
         Subject subject = callerPrincipalCallback.getSubject();
         Principal principal = callerPrincipalCallback.getPrincipal();
         
+        if (principal == null) {
+            principal = new CallerPrincipal(callerPrincipalCallback.getName());
+        }
+        
+        Caller.toSubject(subject, new Caller(principal));
     }
     
     private void processGroupPrincipal(GroupPrincipalCallback groupCallback) {
         Subject subject = groupCallback.getSubject();
         String[] groups = groupCallback.getGroups();
         
+        Caller caller = Caller.fromSubject(subject);
+
+        if (groups != null && groups.length > 0) {
+            if (caller == null) {
+                Caller.toSubject(subject, new Caller(groups)); 
+            } else {
+                caller.addGroups(groups);
+            }
+        } else if (groups == null && caller != null) {
+            caller.getGroups().clear();
+        }
     }
     
     private void processPasswordValidation(PasswordValidationCallback pwdCallback) {
@@ -108,4 +124,3 @@ public abstract class BaseCallbackHandler implements CallbackHandler {
     protected abstract void handleSupportedCallbacks(Callback[] callbacks) throws IOException, UnsupportedCallbackException;
 
 }
-

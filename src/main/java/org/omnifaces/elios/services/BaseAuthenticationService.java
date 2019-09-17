@@ -16,10 +16,18 @@
 
 package org.omnifaces.elios.services;
 
+
+import static java.lang.Boolean.TRUE;
+import static javax.security.auth.message.AuthStatus.SUCCESS;
+import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+import static org.omnifaces.elios.config.helper.HttpServletConstants.IS_MANDATORY;
+
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.CallbackHandler;
@@ -31,57 +39,53 @@ import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 import javax.security.auth.message.config.AuthConfigProvider;
 import javax.security.auth.message.config.ClientAuthConfig;
 import javax.security.auth.message.config.ClientAuthContext;
-import javax.security.auth.message.config.RegistrationListener;
 import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.omnifaces.elios.config.helper.AuthMessagePolicy;
-import org.omnifaces.elios.services.config.CallbackHandlerConfig;
-import org.omnifaces.elios.services.config.HandlerContext;
+import org.omnifaces.elios.config.helper.Caller;
+import org.omnifaces.elios.config.servlet.HttpMessageInfo;
 
 /**
- * This is based Helper class for 196 Configuration. This class implements RegistrationListener.
  */
-public abstract class BaseAuthenticationService {
-    private static final String DEFAULT_HANDLER_CLASS = "com.sun.enterprise.security.jmac.callback.ContainerCallbackHandler";
+public class BaseAuthenticationService {
 
-//    private static String handlerClassName = null;
     protected static final AuthConfigFactory factory = AuthConfigFactory.getFactory();
 
-    private ReadWriteLock rwLock;
-    private Lock rLock;
-    private Lock wLock;
+    private ReadWriteLock readWriteLock;
+    private Lock readLock;
+    private Lock writeLock;
 
     protected String layer;
     protected String appCtxt;
-    protected Map map;
-    protected CallbackHandler cbh;
-    protected AuthConfigRegistrationWrapper listenerWrapper = null;
+    protected Map<String, ?> map;
+    protected CallbackHandler callbackHandler;
+    protected AuthConfigRegistrationWrapper listenerWrapper;
 
-    protected void init(String layer, String appContext, Map map, CallbackHandler cbh) {
-
+    protected void init(String layer, String appContext, Map<String, ?> map, CallbackHandler callbackHandler, RegistrationWrapperRemover removerDelegate) {
         this.layer = layer;
         this.appCtxt = appContext;
         this.map = map;
-        this.cbh = cbh;
-        if (this.cbh == null) {
-            this.cbh = getCallbackHandler();
+        this.callbackHandler = callbackHandler;
+        if (this.callbackHandler == null) {
+            this.callbackHandler = getCallbackHandler();
         }
 
-        this.rwLock = new ReentrantReadWriteLock(true);
-        this.rLock = rwLock.readLock();
-        this.wLock = rwLock.writeLock();
+        this.readWriteLock = new ReentrantReadWriteLock(true);
+        this.readLock = readWriteLock.readLock();
+        this.writeLock = readWriteLock.writeLock();
 
-        listenerWrapper = new AuthConfigRegistrationWrapper(this.layer, this.appCtxt);
-
+        listenerWrapper = new AuthConfigRegistrationWrapper(this.layer, this.appCtxt, removerDelegate);
     }
 
-    public void setJmacProviderRegisID(String jmacProviderRegisID) {
-        this.listenerWrapper.setJmacProviderRegisID(jmacProviderRegisID);
+    public void setRegistrationId(String registrationId) {
+        listenerWrapper.setRegistrationId(registrationId);
     }
 
     public AuthConfigRegistrationWrapper getRegistrationWrapper() {
-        return this.listenerWrapper;
+        return listenerWrapper;
     }
 
     public void setRegistrationWrapper(AuthConfigRegistrationWrapper wrapper) {
@@ -89,7 +93,7 @@ public abstract class BaseAuthenticationService {
     }
 
     public AuthConfigRegistrationWrapper.AuthConfigRegistrationListener getRegistrationListener() {
-        return this.listenerWrapper.getListener();
+        return listenerWrapper.getListener();
     }
 
     public void disable() {
@@ -112,78 +116,87 @@ public abstract class BaseAuthenticationService {
         return (ServerAuthConfig) getAuthConfig(true);
     }
 
-    public ClientAuthContext getClientAuthContext(MessageInfo info, Subject s) throws AuthException {
-        ClientAuthConfig c = (ClientAuthConfig) getAuthConfig(false);
-        if (c != null) {
-            return c.getAuthContext(c.getAuthContextID(info), s, map);
+    public ClientAuthContext getClientAuthContext(MessageInfo info, Subject clientSubject) throws AuthException {
+        ClientAuthConfig clientConfig = (ClientAuthConfig) getAuthConfig(false);
+        if (clientConfig != null) {
+            return clientConfig.getAuthContext(clientConfig.getAuthContextID(info), clientSubject, map);
         }
+
+        return null;
+    }
+    
+    public ServerAuthContext getServerAuthContext(MessageInfo info) throws AuthException {
+        return getServerAuthContext(info, null);
+    }
+
+    public ServerAuthContext getServerAuthContext(MessageInfo info, Subject serviceSubject) throws AuthException {
+        ServerAuthConfig serverAuthConfig = (ServerAuthConfig) getAuthConfig(true);
+        if (serverAuthConfig != null) {
+            return serverAuthConfig.getAuthContext(serverAuthConfig.getAuthContextID(info), serviceSubject, map);
+        }
+
         return null;
     }
 
-    public ServerAuthContext getServerAuthContext(MessageInfo info, Subject s) throws AuthException {
-        ServerAuthConfig c = (ServerAuthConfig) getAuthConfig(true);
-        if (c != null) {
-            return c.getAuthContext(c.getAuthContextID(info), s, map);
-        }
-        return null;
-    }
+    protected AuthConfig getAuthConfig(AuthConfigProvider authConfigProvider, boolean isServer) throws AuthException {
+        AuthConfig authConfig = null;
 
-    protected AuthConfig getAuthConfig(AuthConfigProvider p, boolean isServer) throws AuthException {
-        AuthConfig c = null;
-        if (p != null) {
+        if (authConfigProvider != null) {
             if (isServer) {
-                c = p.getServerAuthConfig(layer, appCtxt, cbh);
+                authConfig = authConfigProvider.getServerAuthConfig(layer, appCtxt, callbackHandler);
             } else {
-                c = p.getClientAuthConfig(layer, appCtxt, cbh);
+                authConfig = authConfigProvider.getClientAuthConfig(layer, appCtxt, callbackHandler);
             }
         }
-        return c;
+
+        return authConfig;
     }
 
     protected AuthConfig getAuthConfig(boolean isServer) throws AuthException {
 
-        ConfigData d = null;
-        AuthConfig c = null;
+        ConfigData configData = null;
+        AuthConfig authConfig = null;
         boolean disabled = false;
-        AuthConfigProvider lastP = null;
+        AuthConfigProvider lastConfigProvider = null;
 
         try {
-            rLock.lock();
-            disabled = (!listenerWrapper.isEnabled());
+            readLock.lock();
+            disabled = !listenerWrapper.isEnabled();
             if (!disabled) {
-                d = listenerWrapper.getConfigData();
-                if (d != null) {
-                    c = (isServer ? d.sConfig : d.cConfig);
-                    lastP = d.provider;
+                configData = listenerWrapper.getConfigData();
+                if (configData != null) {
+                    authConfig = isServer ? configData.getServerConfig() : configData.getClientConfig();
+                    lastConfigProvider = configData.getProvider();
                 }
             }
 
         } finally {
-            rLock.unlock();
-            if (disabled || c != null || (d != null && lastP == null)) {
-                return c;
+            readLock.unlock();
+            if (disabled || authConfig != null || (configData != null && lastConfigProvider == null)) {
+                return authConfig;
             }
         }
 
         // d == null || (d != null && lastP != null && c == null)
-        if (d == null) {
+        if (configData == null) {
             try {
-                wLock.lock();
+                writeLock.lock();
                 if (listenerWrapper.getConfigData() == null) {
-                    AuthConfigProvider nextP = factory.getConfigProvider(layer, appCtxt, this.getRegistrationListener());
-                    if (nextP != null) {
-                        listenerWrapper.setConfigData(new ConfigData(nextP, getAuthConfig(nextP, isServer)));
+                    AuthConfigProvider nextConfigProvider = factory.getConfigProvider(layer, appCtxt, getRegistrationListener());
+
+                    if (nextConfigProvider != null) {
+                        listenerWrapper.setConfigData(new ConfigData(nextConfigProvider, getAuthConfig(nextConfigProvider, isServer)));
                     } else {
                         listenerWrapper.setConfigData(new ConfigData());
                     }
                 }
-                d = listenerWrapper.getConfigData();
+                configData = listenerWrapper.getConfigData();
             } finally {
-                wLock.unlock();
+                writeLock.unlock();
             }
         }
 
-        return ((isServer) ? d.sConfig : d.cConfig);
+        return isServer ? configData.getServerConfig() : configData.getClientConfig();
     }
 
     /**
@@ -191,13 +204,13 @@ public abstract class BaseAuthenticationService {
      */
     protected boolean hasExactMatchAuthProvider() {
         boolean exactMatch = false;
-        // XXX this may need to be optimized
-        AuthConfigProvider p = factory.getConfigProvider(layer, appCtxt, null);
-        if (p != null) {
-            String[] IDs = factory.getRegistrationIDs(p);
-            for (String i : IDs) {
-                RegistrationContext c = factory.getRegistrationContext(i);
-                if (layer.equals(c.getMessageLayer()) && appCtxt.equals(c.getAppContext())) {
+
+        AuthConfigProvider configProvider = factory.getConfigProvider(layer, appCtxt, null);
+
+        if (configProvider != null) {
+            for (String registrationId : factory.getRegistrationIDs(configProvider)) {
+                RegistrationContext registrationContext = factory.getRegistrationContext(registrationId);
+                if (layer.equals(registrationContext.getMessageLayer()) && appCtxt.equals(registrationContext.getAppContext())) {
                     exactMatch = true;
                     break;
                 }
@@ -210,23 +223,41 @@ public abstract class BaseAuthenticationService {
     /**
      * Get the callback default handler
      */
-    private CallbackHandler getCallbackHandler() {
-
-        CallbackHandler rvalue = AuthMessagePolicy.getDefaultCallbackHandler();
-        if (rvalue instanceof CallbackHandlerConfig) {
-            ((CallbackHandlerConfig) rvalue).setHandlerContext(getHandlerContext(map));
-        }
-
-        return rvalue;
+    protected CallbackHandler getCallbackHandler() {
+       return AuthMessagePolicy.getDefaultCallbackHandler();
     }
+    
+    public Caller validateRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, boolean calledFromAuthenticate, Function<HttpServletRequest, Boolean> isMandatoryFn) throws IOException {
+        boolean isMandatory = true;
+        
+        Subject subject = new Subject();
+        MessageInfo messageInfo = new HttpMessageInfo(servletRequest, servletResponse);
+        
+        try {
+            isMandatory = isMandatoryFn.apply(servletRequest);
 
-    /**
-     * This method is invoked by the constructor and should be overrided by subclass.
-     */
-    protected HandlerContext getHandlerContext(Map map) {
+            if (isMandatory || calledFromAuthenticate) {
+                setMandatory(messageInfo);
+            }
+
+            if (!SUCCESS.equals(getServerAuthContext(messageInfo).validateRequest(messageInfo, subject, null))) {
+                return null;
+            }
+            
+            return Caller.fromSubject(subject);
+
+        } catch (AuthException | RuntimeException e) {
+            servletResponse.setStatus(SC_INTERNAL_SERVER_ERROR);
+        }
+        
         return null;
     }
+    
+    @SuppressWarnings("unchecked")
+    private void setMandatory(MessageInfo messageInfo) {
+        messageInfo.getMap().put(IS_MANDATORY, TRUE.toString());
+    }
 
-    
-    
+
+
 }

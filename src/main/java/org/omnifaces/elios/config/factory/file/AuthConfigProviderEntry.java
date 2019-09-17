@@ -16,6 +16,8 @@
 
 package org.omnifaces.elios.config.factory.file;
 
+import static java.util.Arrays.asList;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,31 +26,51 @@ import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.omnifaces.elios.config.factory.RegistrationContextImpl;
 
-/*
- * Each entry is either a constructor entry or a registration entry.
- * Use nulls rather than empty Strings or Lists for fields that
- * have no value.
+/**
+ * Each entry is either a constructor entry or a registration entry. Use nulls rather than empty Strings or Lists for
+ * fields that have no value.
  *
- * This class will not be used outside of its package.
  *
  * @author Bobby Bissett
  */
 public final class AuthConfigProviderEntry {
+
+    /**
+     * The class name of the AuthConfigProvider
+     */
     private final String className;
     private final Map<String, String> properties;
-    private List<RegistrationContext> regContexts;
+
+    private List<RegistrationContext> registrationContexts;
 
     /*
-     * This will create a constructor entry. The className must not be null.
-     *
-     * ONLY CONSTRUCTOR that should be used used to construct defaultEntries (passed RegStoreFileParser construction). DO
-     * NOT USE OTHER CONSTRUCTORS to define defaultEntries because they can create persisted registration entries which are
-     * not appropriate as defaultEntries.
+     * This will create a constructor entry. The class must not be null. ONLY CONSTRUCTOR that should be used used to
+     * construct defaultEntries (passed RegStoreFileParser construction). DO NOT USE OTHER CONSTRUCTORS to define
+     * defaultEntries because they can create persisted registration entries which are not appropriate as defaultEntries.
+     */
+    public AuthConfigProviderEntry(Class<?> clazz) {
+        this(clazz.getName(), null);
+    }
+
+    /*
+     * This will create a constructor entry. The className must not be null. ONLY CONSTRUCTOR that should be used used to
+     * construct defaultEntries (passed RegStoreFileParser construction). DO NOT USE OTHER CONSTRUCTORS to define
+     * defaultEntries because they can create persisted registration entries which are not appropriate as defaultEntries.
+     */
+    public AuthConfigProviderEntry(String className) {
+        this(className, null);
+    }
+
+    /*
+     * This will create a constructor entry. The className must not be null. ONLY OTHER CONSTRUCTOR that should be used used
+     * to construct defaultEntries (passed RegStoreFileParser construction). DO NOT USE OTHER CONSTRUCTORS to define
+     * defaultEntries because they can create persisted registration entries which are not appropriate as defaultEntries.
      */
     public AuthConfigProviderEntry(String className, Map<String, String> properties) {
         if (className == null) {
             throw new IllegalArgumentException("Class name for registration entry cannot be null");
         }
+
         this.className = className;
         this.properties = properties;
     }
@@ -57,45 +79,44 @@ public final class AuthConfigProviderEntry {
      * This will create a registration entry. The list of registration contexts must not be null or empty. Each registration
      * context will contain at least a non-null layer or appContextId.
      */
-    AuthConfigProviderEntry(String className, Map<String, String> properties, List<RegistrationContext> ctxs) {
-
-        if (ctxs == null || ctxs.isEmpty()) {
-            throw new IllegalArgumentException("Registration entry must contain one or" + "more registration contexts");
+    AuthConfigProviderEntry(String className, Map<String, String> properties, List<RegistrationContext> registrationContexts) {
+        if (registrationContexts == null || registrationContexts.isEmpty()) {
+            throw new IllegalArgumentException("Registration entry must contain one or more registration contexts");
         }
+
         this.className = className;
         this.properties = properties;
-        this.regContexts = ctxs;
+        this.registrationContexts = registrationContexts;
     }
 
     /*
      * THIS METHOD MAY BE USED FOR CONSTRUCTOR OR REGISTRATION ENTRIES A helper method for creating a registration entry
      * with one registration context. If the context is null, this entry is a constructor entry.
      */
-    AuthConfigProviderEntry(String className, Map<String, String> properties, RegistrationContext ctx) {
-
+    AuthConfigProviderEntry(String className, Map<String, String> properties, RegistrationContext registrationContext) {
         this.className = className;
         this.properties = properties;
-        if (ctx != null) {
-            RegistrationContext ctxImpl = new RegistrationContextImpl(ctx.getMessageLayer(), ctx.getAppContext(), ctx.getDescription(), ctx.isPersistent());
-            List<RegistrationContext> newList = new ArrayList<RegistrationContext>(1);
-            newList.add(ctxImpl);
-            this.regContexts = newList;
+
+        if (registrationContext != null) {
+            this.registrationContexts = asList(new RegistrationContextImpl(
+                registrationContext.getMessageLayer(),
+                registrationContext.getAppContext(),
+                registrationContext.getDescription(),
+                registrationContext.isPersistent()));
         }
     }
 
-    AuthConfigProviderEntry(AuthConfigProviderEntry parent) {
-        this.className = parent.className;
-        this.properties = parent.properties;
-        if (parent.regContexts != null) {
-            this.regContexts = new ArrayList<RegistrationContext>(1);
-            for (RegistrationContext rc : parent.regContexts) {
-                this.regContexts.add(rc);
-            }
+    AuthConfigProviderEntry(AuthConfigProviderEntry other) {
+        this.className = other.className;
+        this.properties = other.properties;
+
+        if (other.registrationContexts != null) {
+            this.registrationContexts = new ArrayList<RegistrationContext>(other.registrationContexts);
         }
     }
 
     public boolean isConstructorEntry() {
-        return (regContexts == null);
+        return registrationContexts == null;
     }
 
     public String getClassName() {
@@ -106,23 +127,22 @@ public final class AuthConfigProviderEntry {
         return properties;
     }
 
-    public List<RegistrationContext> getRegContexts() {
-        return regContexts;
+    public List<RegistrationContext> getRegistrationContexts() {
+        return registrationContexts;
     }
 
     /*
      * Compares an entry info to this one. They are considered to match if: - they are both constructor or are both
-     * registration entries - the classnames are equal or are both null - the property maps are equal or are both null
-     *
-     * If the entry is a registration entry, registration contexts are not considered for our purposes. For instance, we may
+     * registration entries - the classnames are equal or are both null - the property maps are equal or are both null If
+     * the entry is a registration entry, registration contexts are not considered for our purposes. For instance, we may
      * want to get a certain registration entry in order to add a registration context to it.
-     *
-     * @see com.sun.enterprise.security.jmac.config.RegStoreFileParser
+     * @see com.sun.enterprise.security.jaspic.config.RegStoreFileParser
      */
     boolean matchConstructors(AuthConfigProviderEntry target) {
         if (target == null) {
             return false;
         }
+
         return (!(isConstructorEntry() ^ target.isConstructorEntry()) && matchStrings(className, target.getClassName())
                 && matchMaps(properties, target.getProperties()));
     }
@@ -134,23 +154,27 @@ public final class AuthConfigProviderEntry {
         if (s1 == null && s2 == null) {
             return true;
         }
+
         if (s1 == null || s2 == null) {
             return false;
         }
+
         return s1.equals(s2);
     }
 
     /*
      * Utility method for comparing maps such that two null maps are considered "equal."
      */
-    static boolean matchMaps(Map m1, Map m2) {
-        if (m1 == null && m2 == null) {
+    static boolean matchMaps(Map<String, String> map1, Map<String, String> map2) {
+        if (map1 == null && map2 == null) {
             return true;
         }
-        if (m1 == null || m2 == null) {
+
+        if (map1 == null || map2 == null) {
             return false;
         }
-        return m1.equals(m2);
+
+        return map1.equals(map2);
     }
 
 }

@@ -26,13 +26,13 @@ import javax.security.auth.message.MessagePolicy;
  */
 public interface MessagePolicyDelegate {
 
-    public MessagePolicy getRequestPolicy(String authContextID, Map properties);
+    MessagePolicy getRequestPolicy(String authContextID, Map<String, ?> properties);
 
-    public MessagePolicy getResponsePolicy(String authContextID, Map properties);
+    MessagePolicy getResponsePolicy(String authContextID, Map<String, ?> properties);
 
-    public Class[] getMessageTypes();
+    Class<?>[] getMessageTypes();
 
-    public String getAuthContextID(MessageInfo messageInfo);
+    String getAuthContextID(MessageInfo messageInfo);
 
-    public boolean isProtected();
+    boolean isProtected();
 }

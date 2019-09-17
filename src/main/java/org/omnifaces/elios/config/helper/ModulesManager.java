@@ -16,66 +16,21 @@
 
 package org.omnifaces.elios.config.helper;
 
-import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.AuthStatus;
+import java.util.Map;
 
 /**
+ * The modules manager
  *
  * @author Ron Monzillo
  */
 public abstract class ModulesManager {
+    private boolean returnNullContexts;
 
-    String loggerName;
-    private boolean returnNullContexts = false;
-
-    // include this to force subclasses to call constructor with LoggerName
-    private ModulesManager() {
-
-    }
-
-    protected ModulesManager(String loggerName, boolean returnNullContexts) {
-        this.loggerName = loggerName;
+    protected ModulesManager(boolean returnNullContexts) {
         this.returnNullContexts = returnNullContexts;
     }
-
-    protected boolean isLoggable(Level level) {
-        Logger logger = Logger.getLogger(loggerName);
-        return logger.isLoggable(level);
-    }
-
-    protected void logIfLevel(Level level, Throwable t, String... msgParts) {
-        Logger logger = Logger.getLogger(loggerName);
-        if (logger.isLoggable(level)) {
-            StringBuffer msgB = new StringBuffer("");
-            for (String m : msgParts) {
-                msgB.append(m);
-            }
-            String msg = msgB.toString();
-            if (!msg.isEmpty() && t != null) {
-                logger.log(level, msg, t);
-            } else if (!msg.isEmpty()) {
-                logger.log(level, msg);
-            }
-        }
-    }
-
-    /**
-     *
-     * @param level
-     * @return
-     */
-    protected Logger getLogger(Level level) {
-        Logger rvalue = Logger.getLogger(loggerName);
-        if (rvalue.isLoggable(level)) {
-            return rvalue;
-        }
-        return null;
-    }
-
-    public abstract void refresh();
 
     public boolean returnsNullContexts() {
         return returnNullContexts;
@@ -85,9 +40,10 @@ public abstract class ModulesManager {
         try {
             if (returnNullContexts) {
                 return hasModules(template, authContextID);
-            } else {
-                return true;
             }
+
+            return true;
+
         } catch (AuthException ae) {
             throw new RuntimeException(ae);
         }
@@ -115,20 +71,20 @@ public abstract class ModulesManager {
 
     /**
      *
-     * @param i
+     * @param moduleNumber
      * @param properties
      * @return
      */
-    public abstract Map<String, ?> getInitProperties(int i, Map<String, ?> properties);
+    public abstract Map<String, ?> getInitProperties(int moduleNumber, Map<String, ?> properties);
 
     /**
      *
      * @param successValue
-     * @param i
+     * @param moduleNumber
      * @param moduleStatus
      * @return
      */
-    public abstract boolean exitContext(AuthStatus[] successValue, int i, AuthStatus moduleStatus);
+    public abstract boolean shouldStopProcessingModules(AuthStatus[] successValue, int moduleNumber, AuthStatus moduleStatus);
 
     /**
      *
@@ -139,4 +95,10 @@ public abstract class ModulesManager {
      * @return
      */
     public abstract AuthStatus getReturnStatus(AuthStatus[] successValue, AuthStatus defaultFailStatus, AuthStatus[] status, int position);
+
+    public abstract void refresh();
+
+
+    // ### Protected methods
+
 }

@@ -16,18 +16,22 @@
 
 package org.omnifaces.elios.config.factory;
 
-import java.lang.reflect.Constructor;
+import static java.util.logging.Level.WARNING;
+import static org.omnifaces.elios.config.helper.LogManager.JASPIC_LOGGER;
+import static org.omnifaces.elios.config.helper.LogManager.RES_BUNDLE;
+
+import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.logging.Level;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 import javax.security.auth.message.AuthException;
@@ -37,35 +41,50 @@ import javax.security.auth.message.config.RegistrationListener;
 
 import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
 import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
-import org.omnifaces.elios.config.helper.JASPICLogManager;
+import org.omnifaces.elios.config.helper.OperationLock;
 
 /**
  * This class implements methods in the abstract class AuthConfigFactory.
- * 
+ *
  * @author Shing Wai Chan
  */
 public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
 
-    private static final Logger logger = Logger.getLogger(JASPICLogManager.JASPIC_LOGGER, JASPICLogManager.RES_BUNDLE);
+    private static final Logger logger = Logger.getLogger(JASPIC_LOGGER, RES_BUNDLE);
 
-    private static final ReadWriteLock rwLock = new ReentrantReadWriteLock(true);
-    public static final Lock rLock = rwLock.readLock();
-    public static final Lock wLock = rwLock.writeLock();
+    private static final ReadWriteLock readWriteLock = new ReentrantReadWriteLock(true);
 
-    private static Map<String, AuthConfigProvider> id2ProviderMap;
-    private static Map<String, RegistrationContext> id2RegisContextMap;
-    private static Map<String, List<RegistrationListener>> id2RegisListenersMap;
-    private static Map<AuthConfigProvider, List<String>> provider2IdsMap;
+    private static final OperationLock operationLock = new OperationLock(readWriteLock);
+
+    private static Map<String, AuthConfigProvider> idToProviderMap;
+    private static Map<String, RegistrationContext> idToRegistrationContextMap;
+    private static Map<String, List<RegistrationListener>> idToRegistrationListenersMap;
+    private static Map<AuthConfigProvider, List<String>> providerToIdsMap;
 
     protected static final String CONF_FILE_NAME = "auth.conf";
-
-    abstract protected RegStoreFileParser getRegStore();
 
     /**
      * Get a registered AuthConfigProvider from the factory.
      *
      * Get the provider of ServerAuthConfig and/or ClientAuthConfig objects registered for the identified message layer and
      * application context.
+     *
+     * <p>
+     * All factories shall employ the following precedence rules to select the registered AuthConfigProvider that matches
+     * (via matchConstructors) the layer and appContext arguments:
+     *
+     * <ul>
+     *  <li>The provider that is specifically registered for both the corresponding message layer and appContext shall be
+     *      selected.
+     *   <li>if no provider is selected according to the preceding rule, the provider specifically registered for the
+     *       corresponding appContext and for all message layers shall be selected.
+     *   <li>if no provider is selected according to the preceding rules, the provider specifically registered for the
+     *       corresponding message layer and for all appContexts shall be selected.
+     *   <li>if no provider is selected according to the preceding rules, the provider registered for all message layers and
+     *       for all appContexts shall be selected.
+     *   <li>if no provider is selected according to the preceding rules, the factory shall terminate its search for a
+     *       registered provider.
+     * </ul>
      *
      * @param layer a String identifying the message layer for which the registered AuthConfigProvider is to be returned.
      * This argument may be null.
@@ -79,41 +98,14 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      * @return the implementation of the AuthConfigProvider interface registered at the factory for the layer and appContext
      * or null if no AuthConfigProvider is selected.
      *
-     * <p>
-     * All factories shall employ the following precedence rules to select the registered AuthConfigProvider that matches
-     * (via matchConstructors) the layer and appContext arguments:
-     * <ul>
-     * <li>The provider that is specifically registered for both the corresponding message layer and appContext shall be
-     * selected.
-     * <li>if no provider is selected according to the preceding rule, the provider specifically registered for the
-     * corresponding appContext and for all message layers shall be selected.
-     * <li>if no provider is selected according to the preceding rules, the provider specifically registered for the
-     * corresponding message layer and for all appContexts shall be selected.
-     * <li>if no provider is selected according to the preceding rules, the provider registered for all message layers and
-     * for all appContexts shall be selected.
-     * <li>if no provider is selected according to the preceding rules, the factory shall terminate its search for a
-     * registered provider.
-     * </ul>
      */
     @Override
     public AuthConfigProvider getConfigProvider(String layer, String appContext, RegistrationListener listener) {
-        AuthConfigProvider provider = null;
         if (listener == null) {
-            rLock.lock();
-            try {
-                provider = getConfigProviderUnderLock(layer, appContext, null);
-            } finally {
-                rLock.unlock();
-            }
-        } else {
-            wLock.lock();
-            try {
-                provider = getConfigProviderUnderLock(layer, appContext, listener);
-            } finally {
-                wLock.unlock();
-            }
+            return doReadLocked(() -> getConfigProviderUnderLock(layer, appContext, null));
         }
-        return provider;
+
+        return doWriteLocked(() -> getConfigProviderUnderLock(layer, appContext, listener));
     }
 
     /**
@@ -159,24 +151,18 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      * @exception AuthException if the provider construction or registration fails.
      */
     @Override
-    public String registerConfigProvider(String className, Map properties, String layer, String appContext, String description) {
-        // XXX factory must check permission
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
-        }
-        // XXX do we need doPrivilege here
-        AuthConfigProvider provider = _constructProvider(className, properties, null);
-        return _register(provider, properties, layer, appContext, description, true);
+    @SuppressWarnings("unchecked")
+    public String registerConfigProvider(String className, @SuppressWarnings("rawtypes") Map properties, String layer, String appContext,
+            String description) {
+        tryCheckPermission(providerRegistrationSecurityPermission);
+
+        return _register(_constructProvider(className, properties, null), properties, layer, appContext, description, true);
     }
 
     @Override
     public String registerConfigProvider(AuthConfigProvider provider, String layer, String appContext, String description) {
-        // XXX factory must check permission
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
-        }
+        tryCheckPermission(providerRegistrationSecurityPermission);
+
         return _register(provider, null, layer, appContext, description, false);
     }
 
@@ -194,11 +180,8 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      */
     @Override
     public boolean removeRegistration(String registrationID) {
-        // XXX factory must check permission
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
-        }
+        tryCheckPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
+
         return _unRegister(registrationID);
     }
 
@@ -221,34 +204,30 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      */
     @Override
     public String[] detachListener(RegistrationListener listener, String layer, String appContext) {
-        // XXX factory must check permission
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
-        }
-        ArrayList<String> list = new ArrayList<String>();
-        String regisID = getRegistrationID(layer, appContext);
-        wLock.lock();
-        try {
-            Set<String> targets = id2RegisListenersMap.keySet();
-            for (String targetID : targets) {
-                if (regIdImplies(regisID, targetID)) {
-                    List<RegistrationListener> listeners = id2RegisListenersMap.get(targetID);
+        tryCheckPermission(providerRegistrationSecurityPermission);
+
+        List<String> removedListenerIds = new ArrayList<String>();
+        String registrationId = getRegistrationID(layer, appContext);
+
+        doWriteLocked(() -> {
+            for (Entry<String, List<RegistrationListener>> entry : idToRegistrationListenersMap.entrySet()) {
+                String targetID = entry.getKey();
+                if (regIdImplies(registrationId, targetID)) {
+                    List<RegistrationListener> listeners = entry.getValue();
                     if (listeners != null && listeners.remove(listener)) {
-                        list.add(targetID);
+                        removedListenerIds.add(targetID);
                     }
                 }
             }
-        } finally {
-            wLock.unlock();
-        }
-        return list.toArray(new String[list.size()]);
+        });
+
+        return toArray(removedListenerIds);
     }
 
     /**
      * Get the registration identifiers for all registrations of the provider instance at the factory.
      *
-     * @param provider the AuthConfigurationProvider whose registration identifiers are to be returned. This argument may be
+     * @param configProvider the AuthConfigurationProvider whose registration identifiers are to be returned. This argument may be
      * null, in which case, it indicates that the the id's of all active registration within the factory are returned.
      *
      * @return an array of String values where each value identifies a provider registration at the factory. This method
@@ -256,27 +235,26 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      * provider.
      */
     @Override
-    public String[] getRegistrationIDs(AuthConfigProvider provider) {
-        rLock.lock();
-        try {
-            Collection<String> regisIDs = null;
-            if (provider != null) {
-                regisIDs = provider2IdsMap.get(provider);
+    public String[] getRegistrationIDs(AuthConfigProvider configProvider) {
+        return doReadLocked(() -> {
+            Collection<String> registrationIDs = null;
+
+            if (configProvider != null) {
+                registrationIDs = providerToIdsMap.get(configProvider);
             } else {
-                Collection<List<String>> collList = provider2IdsMap.values();
+                Collection<List<String>> collList = providerToIdsMap.values();
                 if (collList != null) {
-                    regisIDs = new HashSet<String>();
+                    registrationIDs = new HashSet<String>();
                     for (List<String> listIds : collList) {
                         if (listIds != null) {
-                            regisIDs.addAll(listIds);
+                            registrationIDs.addAll(listIds);
                         }
                     }
                 }
             }
-            return ((regisIDs != null) ? regisIDs.toArray(new String[regisIDs.size()]) : new String[0]);
-        } finally {
-            rLock.unlock();
-        }
+
+            return registrationIDs != null ? toArray(registrationIDs) : new String[0];
+        });
     }
 
     /**
@@ -290,12 +268,7 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      */
     @Override
     public RegistrationContext getRegistrationContext(String registrationID) {
-        rLock.lock();
-        try {
-            return id2RegisContextMap.get(registrationID);
-        } finally {
-            rLock.unlock();
-        }
+        return doReadLocked(() -> idToRegistrationContextMap.get(registrationID));
     }
 
     /**
@@ -311,61 +284,55 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      */
     @Override
     public void refresh() {
-        // XXX factory must check permission
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
-        }
-        Map<String, List<RegistrationListener>> preExistingListenersMap;
-        wLock.lock();
-        try {
-            preExistingListenersMap = id2RegisListenersMap;
-            _loadFactory();
-        } finally {
-            wLock.unlock();
-        }
+        tryCheckPermission(AuthConfigFactory.providerRegistrationSecurityPermission);
 
-        // notify pre-existing listeners after (re)loading factory
+        Map<String, List<RegistrationListener>> preExistingListenersMap = doWriteLocked(() -> loadFactory());
+
+        // Notify pre-existing listeners after (re)loading factory
         if (preExistingListenersMap != null) {
             notifyListeners(preExistingListenersMap);
         }
     }
 
+    abstract protected RegStoreFileParser getRegStore();
+
     private AuthConfigProvider getConfigProviderUnderLock(String layer, String appContext, RegistrationListener listener) {
         AuthConfigProvider provider = null;
-        String regisID = getRegistrationID(layer, appContext);
-        String matchedID = null;
+        String registrationID = getRegistrationID(layer, appContext);
+
         boolean providerFound = false;
-        if (id2ProviderMap.containsKey(regisID)) {
-            provider = id2ProviderMap.get(regisID);
+        if (idToProviderMap.containsKey(registrationID)) {
+            provider = idToProviderMap.get(registrationID);
             providerFound = true;
         }
+
         if (!providerFound) {
-            matchedID = getRegistrationID(null, appContext);
-            if (id2ProviderMap.containsKey(matchedID)) {
-                provider = id2ProviderMap.get(matchedID);
+            String matchedID = getRegistrationID(null, appContext);
+            if (idToProviderMap.containsKey(matchedID)) {
+                provider = idToProviderMap.get(matchedID);
                 providerFound = true;
             }
         }
+
         if (!providerFound) {
-            matchedID = getRegistrationID(layer, null);
-            if (id2ProviderMap.containsKey(matchedID)) {
-                provider = id2ProviderMap.get(matchedID);
+            String matchedID = getRegistrationID(layer, null);
+            if (idToProviderMap.containsKey(matchedID)) {
+                provider = idToProviderMap.get(matchedID);
                 providerFound = true;
             }
         }
+
         if (!providerFound) {
-            matchedID = getRegistrationID(null, null);
-            if (id2ProviderMap.containsKey(matchedID)) {
-                provider = id2ProviderMap.get(matchedID);
+            String matchedID = getRegistrationID(null, null);
+            if (idToProviderMap.containsKey(matchedID)) {
+                provider = idToProviderMap.get(matchedID);
             }
         }
+
         if (listener != null) {
-            List<RegistrationListener> listeners = id2RegisListenersMap.get(regisID);
-            if (listeners == null) {
-                listeners = new ArrayList<RegistrationListener>();
-                id2RegisListenersMap.put(regisID, listeners);
-            }
+            List<RegistrationListener> listeners = idToRegistrationListenersMap.computeIfAbsent(
+                    registrationID, e -> new ArrayList<RegistrationListener>());
+
             if (!listeners.contains(listener)) {
                 listeners.add(listener);
             }
@@ -375,7 +342,6 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
     }
 
     private static String getRegistrationID(String layer, String appContext) {
-        String regisID = null;
 
         // __0 (null, null)
         // __1<appContext> (null, appContext)
@@ -383,40 +349,35 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
         // __3<nn>_<layer><appContext> (layer, appContext)
 
         if (layer != null) {
-            regisID = (appContext != null) ? "__3" + layer.length() + "_" + layer + appContext : "__2" + layer;
-        } else {
-            regisID = (appContext != null) ? "__1" + appContext : "__0";
+            return appContext != null ? "__3" + layer.length() + "_" + layer + appContext : "__2" + layer;
         }
-        return regisID;
+
+        return appContext != null ? "__1" + appContext : "__0";
     }
 
     /**
-     * This API decomposes the given regisID into layer and appContext.
-     * 
-     * @param regisID
+     * This API decomposes the given registration ID into layer and appContext.
+     *
+     * @param registrationId
      * @return a String array with layer and appContext
      */
-    private static String[] decomposeRegisID(String regisID) {
+    private static String[] decomposeRegistrationId(String registrationId) {
         String layer = null;
         String appContext = null;
-        if (regisID.equals("__0")) {
+
+        if (registrationId.equals("__0")) {
             // null, null
-        } else if (regisID.startsWith("__1")) {
-            appContext = (regisID.length() == 3) ? "" : regisID.substring(3);
-        } else if (regisID.startsWith("__2")) {
-            layer = (regisID.length() == 3) ? "" : regisID.substring(3);
-        } else if (regisID.startsWith("__3")) {
-            int ind = regisID.indexOf('_', 3);
-            if (regisID.length() > 3 && ind > 0) {
-                String numberString = regisID.substring(3, ind);
-                int n;
-                try {
-                    n = Integer.parseInt(numberString);
-                } catch (Exception ex) {
-                    throw new IllegalArgumentException();
-                }
-                layer = regisID.substring(ind + 1, ind + 1 + n);
-                appContext = regisID.substring(ind + 1 + n);
+        } else if (registrationId.startsWith("__1")) {
+            appContext = (registrationId.length() == 3) ? "" : registrationId.substring(3);
+        } else if (registrationId.startsWith("__2")) {
+            layer = (registrationId.length() == 3) ? "" : registrationId.substring(3);
+        } else if (registrationId.startsWith("__3")) {
+            int ind = registrationId.indexOf('_', 3);
+            if (registrationId.length() > 3 && ind > 0) {
+                int layerLength = stringToInt(registrationId.substring(3, ind));
+
+                layer = registrationId.substring(ind + 1, ind + 1 + layerLength);
+                appContext = registrationId.substring(ind + 1 + layerLength);
             } else {
                 throw new IllegalArgumentException();
             }
@@ -427,138 +388,144 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
         return new String[] { layer, appContext };
     }
 
-    private static AuthConfigProvider _constructProvider(String className, Map properties, AuthConfigFactory factory) {
-        // XXX do we need doPrivilege here
+    private static AuthConfigProvider _constructProvider(String className, Map<String, String> properties, AuthConfigFactory factory) {
         AuthConfigProvider provider = null;
+
         if (className != null) {
             try {
-                ClassLoader loader = Thread.currentThread().getContextClassLoader();
-                Class c = Class.forName(className, true, loader);
-                Constructor<AuthConfigProvider> constr = c.getConstructor(Map.class, AuthConfigFactory.class);
-                provider = constr.newInstance(new Object[] { properties, factory });
+                provider = (AuthConfigProvider) Class.forName(className, true, Thread.currentThread().getContextClassLoader())
+                        .getConstructor(Map.class, AuthConfigFactory.class)
+                        .newInstance(new Object[] { properties, factory });
             } catch (Throwable t) {
                 Throwable cause = t.getCause();
-                logger.log(Level.WARNING, "jmac.factory_unable_to_load_provider",
-                        new Object[] { className, t.toString(), (cause == null ? "cannot determine" : cause.toString()) });
+                logger.log(WARNING, "jaspic.factory_unable_to_load_provider",
+                        new Object[] { className, t.toString(), cause == null ? "cannot determine" : cause.toString() });
             }
         }
+
         return provider;
     }
 
     // XXX need to update persistent state and notify effected listeners
-    private String _register(AuthConfigProvider provider, Map<String, Object> properties, String layer, String appContext, String description,
-            boolean persistent) {
+    private String _register(AuthConfigProvider provider, Map<String, String> properties, String layer, String appContext, String description, boolean persistent) {
+        String registrationId = getRegistrationID(layer, appContext);
+        RegistrationContext registrationContext = new RegistrationContextImpl(layer, appContext, description, persistent);
 
-        String regisID = getRegistrationID(layer, appContext);
-        RegistrationContext rc = new RegistrationContextImpl(layer, appContext, description, persistent);
-        RegistrationContext prevRegisContext = null;
-        Map<String, List<RegistrationListener>> listenerMap;
-        wLock.lock();
-        try {
-            prevRegisContext = id2RegisContextMap.get(regisID);
-            AuthConfigProvider prevProvider = id2ProviderMap.get(regisID);
+        Map<String, List<RegistrationListener>> listenerMap = doWriteLocked(
+                () -> register(provider, properties, persistent, registrationId, registrationContext));
 
-            // handle the persistence first - so that any exceptions occur before
-            // the actual registration happens
-            if (persistent) {
-                _storeRegistration(regisID, rc, provider, properties);
-            } else if (prevRegisContext != null && prevRegisContext.isPersistent()) {
-                _deleteStoredRegistration(regisID, prevRegisContext);
-            }
-
-            boolean wasRegistered = id2ProviderMap.containsKey(regisID);
-
-            if (wasRegistered) {
-                List<String> prevRegisIDs = provider2IdsMap.get(prevProvider);
-                prevRegisIDs.remove(regisID);
-                if (prevRegisIDs.isEmpty()) {
-                    provider2IdsMap.remove(prevProvider);
-                }
-            }
-
-            id2ProviderMap.put(regisID, provider);
-            id2RegisContextMap.put(regisID, rc);
-
-            List<String> regisIDs = provider2IdsMap.get(provider);
-            if (regisIDs == null) {
-                regisIDs = new ArrayList<String>();
-                provider2IdsMap.put(provider, regisIDs);
-            }
-
-            if (!regisIDs.contains(regisID)) {
-                regisIDs.add(regisID);
-            }
-
-            listenerMap = getEffectedListeners(regisID);
-
-        } finally {
-            wLock.unlock();
-        }
-
-        // outside wLock to prevent dead lock
+        // Outside write lock to prevent dead lock
         notifyListeners(listenerMap);
 
-        return regisID;
+        return registrationId;
+    }
+
+    private Map<String, List<RegistrationListener>> register(AuthConfigProvider provider, Map<String, String> properties, boolean persistent, String registrationId, RegistrationContext registrationContext) {
+        RegistrationContext previousRegistrationContext = idToRegistrationContextMap.get(registrationId);
+        AuthConfigProvider previousProvider = idToProviderMap.get(registrationId);
+
+        // Handle the persistence first - so that any exceptions occur before
+        // the actual registration happens
+        if (persistent) {
+            _storeRegistration(registrationContext, provider, properties);
+        } else if (previousRegistrationContext != null && previousRegistrationContext.isPersistent()) {
+            _deleteStoredRegistration(previousRegistrationContext);
+        }
+
+        if (idToProviderMap.containsKey(registrationId)) {
+            List<String> previousRegistrationsIds = providerToIdsMap.get(previousProvider);
+            previousRegistrationsIds.remove(registrationId);
+            if (previousRegistrationsIds.isEmpty()) {
+                providerToIdsMap.remove(previousProvider);
+            }
+        }
+
+        idToProviderMap.put(registrationId, provider);
+        idToRegistrationContextMap.put(registrationId, registrationContext);
+
+        List<String> registrationIds = providerToIdsMap.computeIfAbsent(provider, e -> new ArrayList<String>());
+
+        if (!registrationIds.contains(registrationId)) {
+            registrationIds.add(registrationId);
+        }
+
+        return getEffectedListeners(registrationId);
     }
 
     // XXX need to update persistent state and notify effected listeners
-    private boolean _unRegister(String regisID) {
-        boolean rvalue = false;
-        RegistrationContext rc = null;
-        Map<String, List<RegistrationListener>> listenerMap;
-        wLock.lock();
-        try {
-            rc = id2RegisContextMap.remove(regisID);
-            rvalue = id2ProviderMap.containsKey(regisID);
-            AuthConfigProvider provider = id2ProviderMap.remove(regisID);
-            List<String> regisIDs = provider2IdsMap.get(provider);
-            if (regisIDs != null) {
-                regisIDs.remove(regisID);
+    private boolean _unRegister(String registrationId) {
+
+        Map<String, List<RegistrationListener>> effectedListeners = doWriteLocked(() -> {
+            RegistrationContext registrationContext = idToRegistrationContextMap.remove(registrationId);
+            boolean hasProvider = idToProviderMap.containsKey(registrationId);
+            AuthConfigProvider provider = idToProviderMap.remove(registrationId);
+
+            List<String> registrationIds = providerToIdsMap.get(provider);
+            if (registrationIds != null) {
+                registrationIds.remove(registrationId);
             }
-            if (regisIDs == null || regisIDs.isEmpty()) {
-                provider2IdsMap.remove(provider);
+
+            if (registrationIds == null || registrationIds.isEmpty()) {
+                providerToIdsMap.remove(provider);
             }
-            if (!rvalue) {
-                return false;
+
+            if (!hasProvider) {
+                return null;
             }
-            listenerMap = getEffectedListeners(regisID);
-            if (rc != null && rc.isPersistent()) {
-                _deleteStoredRegistration(regisID, rc);
+
+            Map<String, List<RegistrationListener>> listeners = getEffectedListeners(registrationId);
+            if (registrationContext != null && registrationContext.isPersistent()) {
+                _deleteStoredRegistration(registrationContext);
             }
-        } finally {
-            wLock.unlock();
+
+            return listeners;
+        });
+
+        if (effectedListeners == null) {
+            return false;
         }
 
-        // outside wLock to prevent dead lock
-        notifyListeners(listenerMap);
-        return rvalue;
+
+        // Outside write lock to prevent dead lock
+        notifyListeners(effectedListeners);
+
+        return true;
     }
 
-// the following methods implement the factory's persistence layer
+    private Map<String, List<RegistrationListener>> loadFactory() {
+        Map<String, List<RegistrationListener>> oldId2RegisListenersMap = idToRegistrationListenersMap;
+
+        _loadFactory();
+
+        return oldId2RegisListenersMap;
+    }
+
+    // ### The following methods implement the factory's persistence layer
+
     protected void _loadFactory() {
         try {
             initializeMaps();
 
-            List<AuthConfigProviderEntry> entryList = getRegStore().getPersistedEntries();
+            List<AuthConfigProviderEntry> persistedEntries = getRegStore().getPersistedEntries();
 
-            for (AuthConfigProviderEntry info : entryList) {
-                if (info.isConstructorEntry()) {
-                    _constructProvider(info.getClassName(), info.getProperties(), this);
+            for (AuthConfigProviderEntry authConfigProviderEntry : persistedEntries) {
+                if (authConfigProviderEntry.isConstructorEntry()) {
+                    _constructProvider(authConfigProviderEntry.getClassName(), authConfigProviderEntry.getProperties(), this);
                 } else {
                     boolean first = true;
-                    AuthConfigProvider p = null;
-                    List<RegistrationContext> contexts = (info.getRegContexts());
-                    for (RegistrationContext ctx : contexts) {
+                    AuthConfigProvider configProvider = null;
+                    for (RegistrationContext context : authConfigProviderEntry.getRegistrationContexts()) {
                         if (first) {
-                            p = _constructProvider(info.getClassName(), info.getProperties(), null);
+                            configProvider = _constructProvider(authConfigProviderEntry.getClassName(), authConfigProviderEntry.getProperties(), null);
                         }
-                        _loadRegistration(p, ctx.getMessageLayer(), ctx.getAppContext(), ctx.getDescription());
+
+                        _loadRegistration(configProvider, context.getMessageLayer(), context.getAppContext(), context.getDescription());
                     }
                 }
             }
         } catch (Exception e) {
-            if (logger.isLoggable(Level.WARNING)) {
-                logger.log(Level.WARNING, "jmac.factory_auth_config_loader_failure", e);
+            if (logger.isLoggable(WARNING)) {
+                logger.log(WARNING, "jaspic.factory_auth_config_loader_failure", e);
             }
         }
     }
@@ -567,72 +534,75 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      * Initialize the static maps in a static method
      */
     private static void initializeMaps() {
-        id2ProviderMap = new HashMap<String, AuthConfigProvider>();
-        id2RegisContextMap = new HashMap<String, RegistrationContext>();
-        id2RegisListenersMap = new HashMap<String, List<RegistrationListener>>();
-        provider2IdsMap = new HashMap<AuthConfigProvider, List<String>>();
+        idToProviderMap = new HashMap<String, AuthConfigProvider>();
+        idToRegistrationContextMap = new HashMap<String, RegistrationContext>();
+        idToRegistrationListenersMap = new HashMap<String, List<RegistrationListener>>();
+        providerToIdsMap = new HashMap<AuthConfigProvider, List<String>>();
     }
 
     private static String _loadRegistration(AuthConfigProvider provider, String layer, String appContext, String description) {
 
-        RegistrationContext rc = new RegistrationContextImpl(layer, appContext, description, true);
-        String regisID = getRegistrationID(layer, appContext);
-        id2RegisContextMap.get(regisID);
-        AuthConfigProvider prevProvider = id2ProviderMap.get(regisID);
-        boolean wasRegistered = id2ProviderMap.containsKey(regisID);
+        RegistrationContext registrationContext = new RegistrationContextImpl(layer, appContext, description, true);
+        String registrationId = getRegistrationID(layer, appContext);
+
+        AuthConfigProvider previousProvider = idToProviderMap.get(registrationId);
+
+        boolean wasRegistered = idToProviderMap.containsKey(registrationId);
         if (wasRegistered) {
-            List<String> prevRegisIDs = provider2IdsMap.get(prevProvider);
-            prevRegisIDs.remove(regisID);
-            if (prevRegisIDs.isEmpty()) {
-                provider2IdsMap.remove(prevProvider);
+            List<String> previousRegistrationIds = providerToIdsMap.get(previousProvider);
+            previousRegistrationIds.remove(registrationId);
+            if (previousRegistrationIds.isEmpty()) {
+                providerToIdsMap.remove(previousProvider);
             }
         }
 
-        id2ProviderMap.put(regisID, provider);
-        id2RegisContextMap.put(regisID, rc);
+        idToProviderMap.put(registrationId, provider);
+        idToRegistrationContextMap.put(registrationId, registrationContext);
 
-        List<String> regisIDs = provider2IdsMap.get(provider);
-        if (regisIDs == null) {
-            regisIDs = new ArrayList<String>();
-            provider2IdsMap.put(provider, regisIDs);
+        List<String> registrationIds = providerToIdsMap.get(provider);
+        if (registrationIds == null) {
+            registrationIds = new ArrayList<String>();
+            providerToIdsMap.put(provider, registrationIds);
         }
 
-        if (!regisIDs.contains(regisID)) {
-            regisIDs.add(regisID);
+        if (!registrationIds.contains(registrationId)) {
+            registrationIds.add(registrationId);
         }
 
-        return regisID;
+        return registrationId;
     }
 
-    private void _storeRegistration(String regId, RegistrationContext ctx, AuthConfigProvider p, Map properties) {
-
+    private void _storeRegistration(RegistrationContext registrationContext, AuthConfigProvider configProvider,
+            Map<String, String> properties) {
         String className = null;
-        if (p != null) {
-            className = p.getClass().getName();
+        if (configProvider != null) {
+            className = configProvider.getClass().getName();
         }
+
         if (propertiesContainAnyNonStringValues(properties)) {
             throw new IllegalArgumentException("AuthConfigProvider cannot be registered - properties must all be of type String.");
         }
-        if (ctx.isPersistent()) {
-            getRegStore().store(className, ctx, properties);
+
+        if (registrationContext.isPersistent()) {
+            getRegStore().store(className, registrationContext, properties);
         }
     }
 
-    private boolean propertiesContainAnyNonStringValues(Map<String, Object> props) {
-        if (props != null) {
-            for (Map.Entry<String, Object> entry : props.entrySet()) {
+    private boolean propertiesContainAnyNonStringValues(Map<String, String> properties) {
+        if (properties != null) {
+            for (Map.Entry<String, String> entry : properties.entrySet()) {
                 if (!(entry.getValue() instanceof String)) {
                     return true;
                 }
             }
         }
+
         return false;
     }
 
-    private void _deleteStoredRegistration(String regId, RegistrationContext ctx) {
-
-        if (ctx.isPersistent()) {
-            getRegStore().delete(ctx);
+    private void _deleteStoredRegistration(RegistrationContext registrationContext) {
+        if (registrationContext.isPersistent()) {
+            getRegStore().delete(registrationContext);
         }
     }
 
@@ -640,34 +610,66 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
 
         boolean rvalue = true;
 
-        String[] refID = decomposeRegisID(reference);
-        String[] targetID = decomposeRegisID(target);
+        String[] refID = decomposeRegistrationId(reference);
+        String[] targetID = decomposeRegistrationId(target);
 
         if (refID[0] != null && !refID[0].equals(targetID[0])) {
             rvalue = false;
         } else if (refID[1] != null && !refID[1].equals(targetID[1])) {
             rvalue = false;
         }
+
         return rvalue;
     }
 
-    /*
-     * will return some extra listeners. iow, effected listeners could be reduced by removing any associated with a provider
-     * registration id that is more specific than the one being added or removed.l
+    /**
+     * Will return some extra listeners. In other words, effected listeners could be reduced by removing any associated with
+     * a provider registration id that is more specific than the one being added or removed.
      */
     private static Map<String, List<RegistrationListener>> getEffectedListeners(String regisID) {
         Map<String, List<RegistrationListener>> effectedListeners = new HashMap<String, List<RegistrationListener>>();
-        Set<String> listenerRegistrations = new HashSet<String>(id2RegisListenersMap.keySet());
+        Set<String> listenerRegistrations = new HashSet<String>(idToRegistrationListenersMap.keySet());
 
         for (String listenerID : listenerRegistrations) {
             if (regIdImplies(regisID, listenerID)) {
                 if (!effectedListeners.containsKey(listenerID)) {
                     effectedListeners.put(listenerID, new ArrayList<RegistrationListener>());
                 }
-                effectedListeners.get(listenerID).addAll(id2RegisListenersMap.remove(listenerID));
+                effectedListeners.get(listenerID).addAll(idToRegistrationListenersMap.remove(listenerID));
             }
         }
         return effectedListeners;
+    }
+
+    private static void tryCheckPermission(Permission permission) {
+        SecurityManager securityManager = System.getSecurityManager();
+        if (securityManager != null) {
+            securityManager.checkPermission(permission);
+        }
+    }
+
+    protected <T> T doReadLocked(Supplier<T> supplier) {
+        return operationLock.doReadLocked(supplier);
+    }
+
+    protected <T> T doWriteLocked(Supplier<T> supplier) {
+        return operationLock.doWriteLocked(supplier);
+    }
+
+    protected void doWriteLocked(Runnable runnable) {
+       operationLock.doWriteLocked(runnable);
+    }
+
+    private String[] toArray(Collection<String> collection) {
+        return collection.toArray(new String[collection.size()]);
+    }
+
+    private static int stringToInt(String numberString) {
+        try {
+            return Integer.parseInt(numberString);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException();
+        }
     }
 
     private static void notifyListeners(Map<String, List<RegistrationListener>> map) {
@@ -676,7 +678,7 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
             List<RegistrationListener> listeners = map.get(entry.getKey());
 
             if (listeners != null && listeners.size() > 0) {
-                String[] dIds = decomposeRegisID(entry.getKey());
+                String[] dIds = decomposeRegistrationId(entry.getKey());
 
                 for (RegistrationListener listener : listeners) {
                     listener.notify(dIds[0], dIds[1]);

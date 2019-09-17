@@ -22,7 +22,6 @@ import java.util.Map;
 import javax.security.auth.Subject;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.message.AuthException;
-import javax.security.auth.message.AuthStatus;
 import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.module.ServerAuthModule;
@@ -38,46 +37,45 @@ import org.omnifaces.elios.config.module.context.ServerAuthContextImpl;
  */
 public class ServerAuthConfigImpl extends BaseAuthConfigImpl implements ServerAuthConfig {
 
-    final static AuthStatus[] vR_SuccessValue = { AuthStatus.SUCCESS, AuthStatus.SEND_SUCCESS };
-    final static AuthStatus[] sR_SuccessValue = { AuthStatus.SEND_SUCCESS };
-    HashMap<String, HashMap<Integer, ServerAuthContext>> contextMap;
-    ModulesManager acHelper;
+    private Map<String, Map<Integer, ServerAuthContext>> contextMap;
+    private ModulesManager authContextHelper;
 
-    public ServerAuthConfigImpl(String loggerName, EpochCarrier providerEpoch, ModulesManager acHelper, MessagePolicyDelegate mpDelegate, String layer,
-            String appContext, CallbackHandler cbh) throws AuthException {
-        super(loggerName, providerEpoch, mpDelegate, layer, appContext, cbh);
-        this.acHelper = acHelper;
-        this.mpDelegate = mpDelegate;
+    public ServerAuthConfigImpl(String loggerName, EpochCarrier providerEpoch, ModulesManager authContextHelper, MessagePolicyDelegate policyDelegate,
+            String layer, String appContext, CallbackHandler callbackHandler) throws AuthException {
+
+        super(loggerName, providerEpoch, policyDelegate, layer, appContext, callbackHandler);
+
+        this.authContextHelper = authContextHelper;
+        this.policyDelegate = policyDelegate;
     }
 
     @Override
-    protected void initializeContextMap() {
-        contextMap = new HashMap<String, HashMap<Integer, ServerAuthContext>>();
-    }
-
-    protected void refreshContextHelper() {
-        acHelper.refresh();
-    }
-
-    @Override
-    protected ServerAuthContext createAuthContext(final String authContextID, final Map properties) throws AuthException {
-
-        if (!acHelper.isProtected(new ServerAuthModule[0], authContextID)) {
-            return null;
-        }
-
-        // need to coordinate calls to CallerPrincipalCallback; expecially optional
-        // modules that might reset the result of a required module
-        return new ServerAuthContextImpl(properties);
-    }
-
-    @Override
-    public ServerAuthContext getAuthContext(String authContextID, Subject subject, final Map properties) throws AuthException {
+    @SuppressWarnings("unchecked")
+    public ServerAuthContext getAuthContext(String authContextID, Subject subject, @SuppressWarnings("rawtypes") Map properties) throws AuthException {
         return super.getContext(contextMap, authContextID, subject, properties);
     }
 
     @Override
     public boolean isProtected() {
-        return (!acHelper.returnsNullContexts() || mpDelegate.isProtected());
+        return !authContextHelper.returnsNullContexts() || policyDelegate.isProtected();
     }
+
+    @Override
+    protected void initializeContextMap() {
+        contextMap = new HashMap<>();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    protected <M> M createAuthContext(String authContextID, Map<String, ?> properties) throws AuthException {
+
+        if (!authContextHelper.isProtected(new ServerAuthModule[0], authContextID)) {
+            return null;
+        }
+
+        // Need to coordinate calls to CallerPrincipalCallback; especially optional
+        // modules that might reset the result of a required module
+        return (M) new ServerAuthContextImpl(loggerName, authContextHelper, policyDelegate, getAppContext(), callbackHandler, authContextID, properties);
+    }
+
 }

@@ -1,6 +1,20 @@
-package org.omnifaces.elios.config.module.context;
+/*
+ * Copyright (c) 1997, 2018 Oracle and/or its affiliates. All rights reserved.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License v. 2.0, which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * This Source Code may also be made available under the following Secondary
+ * Licenses when the conditions for such availability set forth in the
+ * Eclipse Public License v. 2.0 are satisfied: GNU General Public License,
+ * version 2 with the GNU Classpath Exception, which is available at
+ * https://www.gnu.org/software/classpath/license.html.
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+ */
 
-import java.util.Map;
+package org.omnifaces.elios.config.module.context;
 
 import javax.security.auth.Subject;
 import javax.security.auth.message.AuthException;
@@ -11,41 +25,27 @@ import javax.security.auth.message.module.ClientAuthModule;
 
 public class GFClientAuthContext implements ClientAuthContext {
 
-    private GFClientAuthConfig config;
-    private ClientAuthModule module;
+    private final ClientAuthModule module;
 
-    GFClientAuthContext(GFClientAuthConfig config, ClientAuthModule module, Map map) {
-        this.config = config;
+    public GFClientAuthContext(ClientAuthModule module) {
+        if (module == null) {
+            throw new IllegalStateException("Module should not be null");
+        }
         this.module = module;
     }
 
-    GFClientAuthContext(GFClientAuthConfig config, Map map) {
-        this.config = config;
-        this.module = null;
-    }
-
+    @Override
     public AuthStatus secureRequest(MessageInfo messageInfo, Subject clientSubject) throws AuthException {
-        if (module != null) {
-            return module.secureRequest(messageInfo, clientSubject);
-        }
-
-        throw new AuthException();
+        return module.secureRequest(messageInfo, clientSubject);
     }
 
+    @Override
     public AuthStatus validateResponse(MessageInfo messageInfo, Subject clientSubject, Subject serviceSubject) throws AuthException {
-        if (module != null) {
-            return module.validateResponse(messageInfo, clientSubject, serviceSubject);
-        }
-
-        throw new AuthException();
+        return module.validateResponse(messageInfo, clientSubject, serviceSubject);
     }
 
+    @Override
     public void cleanSubject(MessageInfo messageInfo, Subject subject) throws AuthException {
-        if (module != null) {
-            module.cleanSubject(messageInfo, subject);
-
-        } else {
-            throw new AuthException();
-        }
+        module.cleanSubject(messageInfo, subject);
     }
 }

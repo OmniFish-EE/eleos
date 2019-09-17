@@ -21,8 +21,6 @@ import java.util.Map;
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.module.ServerAuthModule;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
 import org.omnifaces.elios.config.delegate.ServletMessagePolicyDelegate;
@@ -35,24 +33,22 @@ import org.omnifaces.elios.config.helper.ModulesManager;
 public class JAASServletAuthConfigProvider extends JAASAuthConfigProvider {
 
     private static final String HTTP_SERVLET_LAYER = "HttpServlet";
-    private static final String MANDATORY_KEY = "javax.security.auth.message.MessagePolicy.isMandatory";
-    private static final String MANDATORY_AUTH_CONTEXT_ID = "mandatory";
-    private static final String OPTIONAL_AUTH_CONTEXT_ID = "optional";
-    private static final Class[] moduleTypes = new Class[] { ServerAuthModule.class };
-    private static final Class[] messageTypes = new Class[] { HttpServletRequest.class, HttpServletResponse.class };
-    final static MessagePolicyDelegate mandatoryPolicy = new ServletMessagePolicyDelegate();
 
-    public JAASServletAuthConfigProvider(Map properties, AuthConfigFactory factory) {
+    private static final Class<?>[] moduleTypes = new Class[] { ServerAuthModule.class };
+
+    private static final MessagePolicyDelegate MESSAGE_POLICY_DELEGATE = new ServletMessagePolicyDelegate();
+
+    public JAASServletAuthConfigProvider(Map<String, String> properties, AuthConfigFactory factory) {
         super(properties, factory);
     }
 
     @Override
     public MessagePolicyDelegate getMessagePolicyDelegate(String appContext) throws AuthException {
-        return mandatoryPolicy;
+        return MESSAGE_POLICY_DELEGATE;
     }
 
     @Override
-    protected Class[] getModuleTypes() {
+    protected Class<?>[] getModuleTypes() {
         return moduleTypes;
     }
 
@@ -60,10 +56,12 @@ public class JAASServletAuthConfigProvider extends JAASAuthConfigProvider {
     protected String getLayer() {
         return HTTP_SERVLET_LAYER;
     }
-
+    
     @Override
-    public ModulesManager getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
-        // overrides returnNullContexts to false (as required by Servlet Profile)
-        return super.getAuthContextHelper(appContext, false);
+    public ModulesManager getModulesManager(String appContext, boolean returnNullContexts) throws AuthException {
+        // overrides returnNullContexts to false (as required by Servlet Container Profile)
+        return super.getModulesManager(appContext, false);
     }
+
+
 }

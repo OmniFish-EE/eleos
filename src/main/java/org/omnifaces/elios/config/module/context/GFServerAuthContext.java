@@ -1,121 +1,51 @@
+/*
+ * Copyright (c) 1997, 2018 Oracle and/or its affiliates. All rights reserved.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License v. 2.0, which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * This Source Code may also be made available under the following Secondary
+ * Licenses when the conditions for such availability set forth in the
+ * Eclipse Public License v. 2.0 are satisfied: GNU General Public License,
+ * version 2 with the GNU Classpath Exception, which is available at
+ * https://www.gnu.org/software/classpath/license.html.
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+ */
+
 package org.omnifaces.elios.config.module.context;
 
-import java.security.AccessController;
-import java.security.Principal;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import javax.security.auth.Subject;
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.AuthStatus;
 import javax.security.auth.message.MessageInfo;
-import javax.security.auth.message.callback.CallerPrincipalCallback;
 import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.module.ServerAuthModule;
 
-import org.omnifaces.elios.config.module.config.GFServerAuthConfig;
-import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
-
 public class GFServerAuthContext implements ServerAuthContext {
 
-        private GFServerAuthConfig config;
-        private ServerAuthModule module;
+    private final ServerAuthModule module;
 
-        private Map map;
-        boolean managesSession = false;
-
-        GFServerAuthContext(GFServerAuthConfig config, ServerAuthModule module, Map map) {
-            this.config = config;
-            this.module = module;
-            this.map = map;
+    public GFServerAuthContext(ServerAuthModule module) {
+        if (module == null) {
+            throw new IllegalStateException("Module should not be null");
         }
-
-        GFServerAuthContext(GFServerAuthConfig config, Map map) {
-            this.config = config;
-            this.module = null;
-            this.map = map;
-            if (map != null) {
-                String msStr = (String) map.get(GFServerConfigProvider.MANAGES_SESSIONS_OPTION);
-                if (msStr != null) {
-                    managesSession = Boolean.valueOf(msStr);
-                }
-            }
-        }
-
-        // for old modules
-        private static void _setCallerPrincipals(Subject s, CallbackHandler handler, Subject pvcSubject) throws AuthException {
-
-            if (handler != null) { // handler should be non-null
-                Set<Principal> ps = s.getPrincipals();
-                if (ps == null || ps.isEmpty()) {
-                    return;
-                }
-                Iterator<Principal> it = ps.iterator();
-
-                Callback[] callbacks = new Callback[] { new CallerPrincipalCallback(s, it.next().getName()) };
-                if (pvcSubject != null) {
-                    s.getPrincipals().addAll(pvcSubject.getPrincipals());
-                }
-
-                try {
-                    handler.handle(callbacks);
-                } catch (Exception e) {
-                    AuthException aex = new AuthException();
-                    aex.initCause(e);
-                    throw aex;
-                }
-            }
-        }
-
-        // for old modules
-        private static void setCallerPrincipals(final Subject s, final CallbackHandler handler, final Subject pvcSubject) throws AuthException {
-            if (System.getSecurityManager() == null) {
-                _setCallerPrincipals(s, handler, pvcSubject);
-            } else {
-                try {
-                    AccessController.doPrivileged(new PrivilegedExceptionAction() {
-                        public Object run() throws Exception {
-                            _setCallerPrincipals(s, handler, pvcSubject);
-                            return null;
-                        }
-                    });
-                } catch (PrivilegedActionException pae) {
-                    Throwable cause = pae.getCause();
-                    AuthException aex = new AuthException();
-                    aex.initCause(cause);
-                    throw aex;
-                }
-            }
-        }
-
-        public AuthStatus validateRequest(MessageInfo messageInfo, Subject clientSubject, Subject serviceSubject) throws AuthException {
-            if (module != null) {
-                return module.validateRequest(messageInfo, clientSubject, serviceSubject);
-            }
-
-            throw new AuthException();
-
-        }
-
-        public AuthStatus secureResponse(MessageInfo messageInfo, Subject serviceSubject) throws AuthException {
-            if (module != null) {
-                return module.secureResponse(messageInfo, serviceSubject);
-            }
-
-            throw new AuthException();
-
-        }
-
-        public void cleanSubject(MessageInfo messageInfo, Subject subject) throws AuthException {
-            if (module != null) {
-                module.cleanSubject(messageInfo, subject);
-            } else {
-                throw new AuthException();
-            }
-        }
+        this.module = module;
     }
+
+    @Override
+    public AuthStatus validateRequest(MessageInfo messageInfo, Subject clientSubject, Subject serviceSubject) throws AuthException {
+        return module.validateRequest(messageInfo, clientSubject, serviceSubject);
+    }
+
+    @Override
+    public AuthStatus secureResponse(MessageInfo messageInfo, Subject serviceSubject) throws AuthException {
+        return module.secureResponse(messageInfo, serviceSubject);
+    }
+
+    @Override
+    public void cleanSubject(MessageInfo messageInfo, Subject subject) throws AuthException {
+        module.cleanSubject(messageInfo, subject);
+    }
+}

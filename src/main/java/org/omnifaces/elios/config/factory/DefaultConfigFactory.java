@@ -16,8 +16,7 @@
 
 package org.omnifaces.elios.config.factory;
 
-import java.util.ArrayList;
-import java.util.List;
+import static java.util.Arrays.asList;
 
 import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
 import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
@@ -25,71 +24,46 @@ import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
 
 /**
  * This class implements methods in the abstract class AuthConfigFactory.
- * 
+ *
  * @author Shing Wai Chan
  */
 public class DefaultConfigFactory extends BaseAuthConfigFactory {
 
     // MUST "hide" regStore in derived class.
-    static RegStoreFileParser regStore = null;
+    private static RegStoreFileParser regStore;
 
     /**
      * to specialize the defaultEntries passed to the RegStoreFileParser constructor, create another subclass of
      * BaseAuthconfigFactory, that is basically a copy of this class, with a change to the third argument of the call to new
      * ResSToreFileParser. to ensure runtime use of the the associated regStore, make sure that the new subclass also
-     * contains an implementation of the getRegStore method. As done within this class, use the locks defined in
+     * contains an implementation of the getRegStore method.
+     *
+     * <p>
+     * As done within this class, use the locks defined in
      * BaseAuthConfigFactory to serialize access to the regStore (both within the class constructor, and within getRegStore)
      *
-     * All EentyInfo OBJECTS PASSED as deualtEntries MUST HAVE BEEN CONSTRCTED USING THE FOLLOWING CONSTRUCTOR:
+     * <p>
+     * All EEntyInfo OBJECTS PASSED as deualtEntries MUST HAVE BEEN CONSTRUCTED USING THE FOLLOWING CONSTRUCTOR:
      *
      * EntryInfo(String className, Map<String, String> properties);
      *
      */
     public DefaultConfigFactory() {
-        rLock.lock();
-        try {
-            if (regStore != null) {
-                return;
-            }
-        } finally {
-            rLock.unlock();
+        if (doReadLocked(() -> regStore != null)) {
+            return;
         }
-        String userDir = System.getProperty("user.dir");
-        wLock.lock();
-        try {
+
+        doWriteLocked(() -> {
             if (regStore == null) {
-                initializeRegStore(userDir);
+                regStore = new RegStoreFileParser(asList(new AuthConfigProviderEntry(GFServerConfigProvider.class.getName())));
                 _loadFactory();
             }
-        } finally {
-            wLock.unlock();
-        }
-    }
-
-    /**
-     * @param userDir
-     */
-    private static void initializeRegStore(String userDir) {
-        regStore = new RegStoreFileParser(userDir, BaseAuthConfigFactory.CONF_FILE_NAME, getDefaultProviders());
+        });
     }
 
     @Override
     protected RegStoreFileParser getRegStore() {
-        rLock.lock();
-        try {
-            return regStore;
-        } finally {
-            rLock.unlock();
-        }
-    }
-
-    /*
-     * Contains the default providers used when none are configured in a factory configuration file.
-     */
-    static List<AuthConfigProviderEntry> getDefaultProviders() {
-        List<AuthConfigProviderEntry> entries = new ArrayList<AuthConfigProviderEntry>(1);
-        entries.add(new AuthConfigProviderEntry(GFServerConfigProvider.class.getName(), null));
-        return entries;
+        return doReadLocked(() -> regStore);
     }
 
 }

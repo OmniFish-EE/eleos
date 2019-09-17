@@ -16,9 +16,14 @@
 
 package org.omnifaces.elios.config.jaas;
 
-import com.sun.security.auth.login.ConfigFile;
+import static java.util.Collections.emptyMap;
+import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.REQUIRED;
+import static org.omnifaces.elios.config.helper.LogManager.JASPIC_LOGGER;
+import static org.omnifaces.elios.config.helper.LogManager.RES_BUNDLE;
+
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -26,9 +31,10 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.security.auth.login.AppConfigurationEntry;
 
-import org.omnifaces.elios.config.helper.JASPICLogManager;
+import com.sun.security.auth.login.ConfigFile;
 
 /**
  *
@@ -36,8 +42,23 @@ import org.omnifaces.elios.config.helper.JASPICLogManager;
  */
 public class ExtendedConfigFile extends ConfigFile {
 
-    private static final Logger logger = Logger.getLogger(JASPICLogManager.JASPIC_LOGGER, JASPICLogManager.RES_BUNDLE);
+    private static final Logger logger = Logger.getLogger(JASPIC_LOGGER, RES_BUNDLE);
     // may be more than one delegate for a given jaas config file
+
+    private Class<?> moduleClass;
+
+    public static ExtendedConfigFile fromFileName(String configFileName) {
+        if (configFileName == null) {
+            return new ExtendedConfigFile();
+        }
+
+        try {
+            return new ExtendedConfigFile(new URI(configFileName));
+        } catch (URISyntaxException use) {
+            throw new IllegalArgumentException(use);
+        }
+
+    }
 
     public ExtendedConfigFile() {
     }
@@ -50,10 +71,28 @@ public class ExtendedConfigFile extends ConfigFile {
         super(uri);
     }
 
+    public ExtendedConfigFile(Class<?> moduleClass) {
+        this.moduleClass = moduleClass;
+    }
+
+    @Override
+    public AppConfigurationEntry[] getAppConfigurationEntry(String applicationName) {
+        if (moduleClass == null) {
+            return super.getAppConfigurationEntry(applicationName);
+        }
+
+        AppConfigurationEntry appConfigurationEntry = new AppConfigurationEntry(
+                moduleClass.getName(),
+                REQUIRED,
+                emptyMap());
+
+        return new AppConfigurationEntry[] {appConfigurationEntry};
+    }
+
     /**
      * The ExtendedConfigFile subclass was created because the Configuration interface does not provide a way to do what
      * this method does; i.e. get all the app names from the config.
-     * 
+     *
      * @param authModuleClass an Array of Class objects or null. When this parameter is not null, the appnames are filtered
      * by removing all names that are not associated via an AppConfigurationEntry with at least one LoginModule that
      * implements an authModuleClass.

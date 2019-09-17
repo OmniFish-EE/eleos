@@ -1,8 +1,29 @@
+/*
+ * Copyright (c) 1997, 2018 Oracle and/or its affiliates. All rights reserved.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License v. 2.0, which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * This Source Code may also be made available under the following Secondary
+ * Licenses when the conditions for such availability set forth in the
+ * Eclipse Public License v. 2.0 are satisfied: GNU General Public License,
+ * version 2 with the GNU Classpath Exception, which is available at
+ * https://www.gnu.org/software/classpath/license.html.
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+ */
+
 package org.omnifaces.elios.config.module.context;
 
-import java.util.HashMap;
+import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
+import static javax.security.auth.message.AuthStatus.SEND_FAILURE;
+import static javax.security.auth.message.AuthStatus.SEND_SUCCESS;
+import static javax.security.auth.message.AuthStatus.SUCCESS;
+
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -16,134 +37,167 @@ import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.module.ServerAuthModule;
 
 import org.omnifaces.elios.config.delegate.MessagePolicyDelegate;
-import org.omnifaces.elios.config.helper.EpochCarrier;
 import org.omnifaces.elios.config.helper.ModulesManager;
 
 public class ServerAuthContextImpl implements ServerAuthContext {
 
-    final static AuthStatus[] vR_SuccessValue = { AuthStatus.SUCCESS, AuthStatus.SEND_SUCCESS };
-    final static AuthStatus[] sR_SuccessValue = { AuthStatus.SEND_SUCCESS };
-    HashMap<String, HashMap<Integer, ServerAuthContext>> contextMap;
-    ModulesManager acHelper;
+    private final static AuthStatus[] validateRequestSuccessValues = { SUCCESS, SEND_SUCCESS };
+    private final static AuthStatus[] secureResponseSuccessValues = { SEND_SUCCESS };
 
     private String loggerName;
 
+    private ModulesManager modulesManager;
+
+    private MessagePolicyDelegate policyDelegate;
+
+    private String appContext;
+
+    private CallbackHandler callbackHandler;
+
     private String authContextID;
-    
-    EpochCarrier providerEpoch;
-    long epoch;
-    MessagePolicyDelegate mpDelegate;
-    String layer;
-    String appContext;
-    CallbackHandler cbh;
-    private ReentrantReadWriteLock instanceReadWriteLock = new ReentrantReadWriteLock();
-    
-    final Map properties;
-    
-    public ServerAuthContextImpl(Map properties) {
+
+    private Map<String, ?> properties;
+
+    private ServerAuthModule[] serverAuthModules;
+
+
+    public ServerAuthContextImpl(String loggerName, ModulesManager modulesManager,
+            MessagePolicyDelegate policyDelegate, String appContext, CallbackHandler callbackHandler, String authContextID, Map<String, ?> properties) {
+
+        this.loggerName = loggerName;
+        this.modulesManager = modulesManager;
+        this.policyDelegate = policyDelegate;
+        this.appContext = appContext;
+        this.callbackHandler = callbackHandler;
+        this.authContextID = authContextID;
         this.properties = properties;
-    }
 
-    ServerAuthModule[] module = init();
-
-    ServerAuthModule[] init() {
-        ServerAuthModule[] m;
-        try {
-            m = acHelper.getModules(new ServerAuthModule[0], authContextID);
-        } catch (AuthException ae) {
-            logIfLevel(Level.SEVERE, ae, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "unable to load server auth modules");
-            throw new RuntimeException(ae);
-        }
-
-        MessagePolicy requestPolicy = mpDelegate.getRequestPolicy(authContextID, properties);
-        MessagePolicy responsePolicy = mpDelegate.getResponsePolicy(authContextID, properties);
-
-        boolean noModules = true;
-        for (int i = 0; i < m.length; i++) {
-            if (m[i] != null) {
-                if (isLoggable(Level.FINE)) {
-                    logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "initializing module");
-                }
-                noModules = false;
-                try {
-                    checkMessageTypes(m[i].getSupportedMessageTypes());
-                    m[i].initialize(requestPolicy, responsePolicy, cbh, acHelper.getInitProperties(i, properties));
-                } catch (AuthException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            }
-        }
-        if (noModules) {
-            logIfLevel(Level.WARNING, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "contains no Auth Modules");
-        }
-        return m;
+        this.serverAuthModules = getServerAuthModules();
     }
 
     @Override
-    public AuthStatus validateRequest(MessageInfo arg0, Subject arg1, Subject arg2) throws AuthException {
-        AuthStatus[] status = new AuthStatus[module.length];
-        for (int i = 0; i < module.length; i++) {
-            if (module[i] == null) {
+    public AuthStatus validateRequest(MessageInfo messageInfo, Subject clientSubject, Subject serviceSubject) throws AuthException {
+        AuthStatus[] status = new AuthStatus[serverAuthModules.length];
+
+        for (int moduleNumber = 0; moduleNumber < serverAuthModules.length; moduleNumber++) {
+            if (serverAuthModules[moduleNumber] == null) {
                 continue;
             }
-            if (isLoggable(Level.FINE)) {
-                logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "calling vaidateRequest on module");
+
+            if (isLoggable(FINE)) {
+                logIfLevel(FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", appContext,
+                        "calling vaidateRequest on module");
             }
-            status[i] = module[i].validateRequest(arg0, arg1, arg2);
-            if (acHelper.exitContext(vR_SuccessValue, i, status[i])) {
-                return acHelper.getReturnStatus(vR_SuccessValue, AuthStatus.SEND_FAILURE, status, i);
+
+            status[moduleNumber] = serverAuthModules[moduleNumber].validateRequest(messageInfo, clientSubject, serviceSubject);
+
+            if (modulesManager.shouldStopProcessingModules(validateRequestSuccessValues, moduleNumber, status[moduleNumber])) {
+                return modulesManager.getReturnStatus(validateRequestSuccessValues, SEND_FAILURE, status, moduleNumber);
             }
         }
-        return acHelper.getReturnStatus(vR_SuccessValue, AuthStatus.SEND_FAILURE, status, status.length - 1);
+
+        return modulesManager.getReturnStatus(validateRequestSuccessValues, SEND_FAILURE, status, status.length - 1);
     }
 
     @Override
-    public AuthStatus secureResponse(MessageInfo arg0, Subject arg1) throws AuthException {
-        AuthStatus[] status = new AuthStatus[module.length];
-        for (int i = 0; i < module.length; i++) {
-            if (module[i] == null) {
+    public AuthStatus secureResponse(MessageInfo messageInfo, Subject serviceSubject) throws AuthException {
+        AuthStatus[] status = new AuthStatus[serverAuthModules.length];
+
+        for (int i = 0; i < serverAuthModules.length; i++) {
+            if (serverAuthModules[i] == null) {
                 continue;
             }
-            if (isLoggable(Level.FINE)) {
-                logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "calling secureResponse on module");
+
+            if (isLoggable(FINE)) {
+                logIfLevel(FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", appContext,
+                        "calling secureResponse on module");
             }
-            status[i] = module[i].secureResponse(arg0, arg1);
-            if (acHelper.exitContext(sR_SuccessValue, i, status[i])) {
-                return acHelper.getReturnStatus(sR_SuccessValue, AuthStatus.SEND_FAILURE, status, i);
+
+            status[i] = serverAuthModules[i].secureResponse(messageInfo, serviceSubject);
+
+            if (modulesManager.shouldStopProcessingModules(secureResponseSuccessValues, i, status[i])) {
+                return modulesManager.getReturnStatus(secureResponseSuccessValues, SEND_FAILURE, status, i);
             }
         }
-        return acHelper.getReturnStatus(sR_SuccessValue, AuthStatus.SEND_FAILURE, status, status.length - 1);
+
+        return modulesManager.getReturnStatus(secureResponseSuccessValues, SEND_FAILURE, status, status.length - 1);
     }
 
     @Override
     public void cleanSubject(MessageInfo arg0, Subject arg1) throws AuthException {
-        for (int i = 0; i < module.length; i++) {
-            if (module[i] == null) {
+        for (int i = 0; i < serverAuthModules.length; i++) {
+            if (serverAuthModules[i] == null) {
                 continue;
             }
+
             if (isLoggable(Level.FINE)) {
-                logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", getAppContext(), "calling cleanSubject on module");
+                logIfLevel(Level.FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", appContext,
+                        "calling cleanSubject on module");
             }
-            module[i].cleanSubject(arg0, arg1);
+
+            serverAuthModules[i].cleanSubject(arg0, arg1);
         }
     }
 
-    
+    private ServerAuthModule[] getServerAuthModules() {
+        try {
+            ServerAuthModule[] serverAuthModules;
+
+            try {
+                serverAuthModules = modulesManager.getModules(new ServerAuthModule[0], authContextID);
+            } catch (AuthException ae) {
+                logIfLevel(SEVERE, ae, "ServerAuthContext: ", authContextID, "of AppContext: ", appContext,
+                        "unable to load server auth modules");
+                throw ae;
+            }
+
+            MessagePolicy requestPolicy = policyDelegate.getRequestPolicy(authContextID, properties);
+            MessagePolicy responsePolicy = policyDelegate.getResponsePolicy(authContextID, properties);
+
+            boolean noModules = true;
+            for (int i = 0; i < serverAuthModules.length; i++) {
+                if (serverAuthModules[i] != null) {
+                    if (isLoggable(FINE)) {
+                        logIfLevel(FINE, null, "ServerAuthContext: ", authContextID, "of AppContext: ", appContext,
+                                "initializing module");
+                    }
+
+                    noModules = false;
+                    checkMessageTypes(serverAuthModules[i].getSupportedMessageTypes());
+
+                    serverAuthModules[i].initialize(
+                            requestPolicy, responsePolicy,
+                            callbackHandler, modulesManager.getInitProperties(i, properties));
+                }
+            }
+
+            if (noModules) {
+                logIfLevel(WARNING, null, "ServerAuthContext: ", authContextID, "of AppContext: ", appContext,
+                        "contains no Auth Modules");
+            }
+
+            return serverAuthModules;
+        } catch (AuthException e) {
+            throw new IllegalStateException(e);
+        }
+    }
 
     protected boolean isLoggable(Level level) {
-        Logger logger = Logger.getLogger(loggerName);
-        return logger.isLoggable(level);
+        return Logger.getLogger(loggerName).isLoggable(level);
     }
 
     protected void logIfLevel(Level level, Throwable t, String... msgParts) {
         Logger logger = Logger.getLogger(loggerName);
+
         if (logger.isLoggable(level)) {
-            StringBuffer msgB = new StringBuffer("");
+            StringBuilder messageBuffer = new StringBuilder("");
+
             for (String m : msgParts) {
-                msgB.append(m);
+                messageBuffer.append(m);
             }
-            String msg = msgB.toString();
+
+            String msg = messageBuffer.toString();
+
             if (!msg.isEmpty() && t != null) {
                 logger.log(level, msg, t);
             } else if (!msg.isEmpty()) {
@@ -151,24 +205,22 @@ public class ServerAuthContextImpl implements ServerAuthContext {
             }
         }
     }
-    
-    public String getAppContext() {
-        return appContext;
-    }
-    
-    protected void checkMessageTypes(Class[] supportedMessageTypes) throws AuthException {
-        Class[] requiredMessageTypes = mpDelegate.getMessageTypes();
-        for (Class requiredType : requiredMessageTypes) {
+
+    protected void checkMessageTypes(Class<?>[] supportedMessageTypes) throws AuthException {
+        Class<?>[] requiredMessageTypes = policyDelegate.getMessageTypes();
+        for (Class<?> requiredType : requiredMessageTypes) {
             boolean supported = false;
-            for (Class supportedType : supportedMessageTypes) {
+            for (Class<?> supportedType : supportedMessageTypes) {
                 if (requiredType.isAssignableFrom(supportedType)) {
                     supported = true;
                 }
             }
+
             if (!supported) {
                 throw new AuthException("module does not support message type: " + requiredType.getName());
             }
         }
     }
+
 
 }

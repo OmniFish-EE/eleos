@@ -19,11 +19,12 @@ package org.omnifaces.elios.config.factory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
 
 import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
+import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
 
-/*
- * Class used by GFAuthConfigFactory and EntryInfo.
+/**
+ * Class used by {@link BaseAuthConfigFactory}, {@link AuthConfigProviderEntry} and {@link RegStoreFileParser}
  *
- * This class will not be used outside of its package.
+ * This class will *not* be used outside of its package.
  */
 public final class RegistrationContextImpl implements RegistrationContext {
     private final String messageLayer;
@@ -32,7 +33,6 @@ public final class RegistrationContextImpl implements RegistrationContext {
     private final boolean isPersistent;
 
     public RegistrationContextImpl(String messageLayer, String appContext, String description, boolean persistent) {
-
         this.messageLayer = messageLayer;
         this.appContext = appContext;
         this.description = description;
@@ -40,11 +40,11 @@ public final class RegistrationContextImpl implements RegistrationContext {
     }
 
     // helper method to create impl class
-    public RegistrationContextImpl(RegistrationContext ctx) {
-        this.messageLayer = ctx.getMessageLayer();
-        this.appContext = ctx.getAppContext();
-        this.description = ctx.getDescription();
-        this.isPersistent = ctx.isPersistent();
+    public RegistrationContextImpl(RegistrationContext registrationContext) {
+        this.messageLayer = registrationContext.getMessageLayer();
+        this.appContext = registrationContext.getAppContext();
+        this.description = registrationContext.getDescription();
+        this.isPersistent = registrationContext.isPersistent();
     }
 
     @Override
@@ -72,9 +72,12 @@ public final class RegistrationContextImpl implements RegistrationContext {
         if (o == null || !(o instanceof RegistrationContext)) {
             return false;
         }
+
         RegistrationContext target = (RegistrationContext) o;
-        return (AuthConfigProviderEntry.matchStrings(messageLayer, target.getMessageLayer()) && AuthConfigProviderEntry.matchStrings(appContext, target.getAppContext())
-                && isPersistent() == target.isPersistent());
+
+        return (AuthConfigProviderEntry.matchStrings(messageLayer, target.getMessageLayer()) &&
+                AuthConfigProviderEntry.matchStrings(appContext, target.getAppContext()) &&
+                isPersistent() == target.isPersistent());
     }
 
     @Override

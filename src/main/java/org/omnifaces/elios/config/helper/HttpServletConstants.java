@@ -20,13 +20,16 @@ package org.omnifaces.elios.config.helper;
  * This is used to do HttpServlet security for app server
  */
 public class HttpServletConstants {
+
     public static final String AUTH_TYPE = "javax.servlet.http.authType";
-    public static final String WEB_BUNDLE = "WEB_BUNDLE";
     public static final String POLICY_CONTEXT = "javax.security.jacc.PolicyContext";
     public static final String IS_MANDATORY = "javax.security.auth.message.MessagePolicy.isMandatory";
     public static final String REGISTER_SESSION = "javax.servlet.http.registerSession";
-    @Deprecated
-    public static final String REGISTER_WITH_AUTHENTICATOR = "com.sun.web.RealmAdapter.register";
+    public static final String SOAP = "SOAP";
+    public static final String HTTPSERVLET = "HttpServlet";
+
+    public static final String CLIENT = "client";
+    public static final String SERVER = "server";
 
     private HttpServletConstants() {
     }

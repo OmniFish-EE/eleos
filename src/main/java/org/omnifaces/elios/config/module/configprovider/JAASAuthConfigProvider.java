@@ -16,10 +16,9 @@
 
 package org.omnifaces.elios.config.module.configprovider;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Locale;
 import java.util.Map;
+
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigFactory.RegistrationContext;
@@ -38,29 +37,16 @@ public abstract class JAASAuthConfigProvider extends BaseAuthConfigProvider {
     private static final String DEFAULT_JAAS_APP_NAME = "other";
     private static final String ALL_APPS = "*";
 
-    private String configFileName;
-    private ExtendedConfigFile jaasConfig;
+    private ExtendedConfigFile jaasConfigFile;
 
     private Map<String, ?> properties;
     private AuthConfigFactory factory;
 
-    public JAASAuthConfigProvider(Map properties, AuthConfigFactory factory) {
+    public JAASAuthConfigProvider(Map<String, ?> properties, AuthConfigFactory factory) {
         this.properties = properties;
         this.factory = factory;
+        this.jaasConfigFile = ExtendedConfigFile.fromFileName(getProperty(CONFIG_FILE_NAME_KEY, null));
 
-        configFileName = getProperty(CONFIG_FILE_NAME_KEY, null);
-
-        if (configFileName == null) {
-            jaasConfig = new ExtendedConfigFile();
-        } else {
-            try {
-                URI uri = new URI(configFileName);
-                jaasConfig = new ExtendedConfigFile(uri);
-            } catch (URISyntaxException use) {
-                IllegalArgumentException iae = new IllegalArgumentException(use);
-                throw iae;
-            }
-        }
         selfRegister();
     }
 
@@ -74,10 +60,33 @@ public abstract class JAASAuthConfigProvider extends BaseAuthConfigProvider {
         return factory;
     }
 
-    private RegistrationContext getRegistrationContext(String id) {
+    @Override
+    public AuthConfigFactory.RegistrationContext[] getSelfRegistrationContexts() {
+        String[] appContexts = jaasConfigFile.getAppNames(getModuleTypes());
 
-        final String layer = getLayer();
-        final String appContext;
+        RegistrationContext[] selfRegistrationContexts = new RegistrationContext[appContexts.length];
+        for (int i = 0; i < appContexts.length; i++) {
+            selfRegistrationContexts[i] = getRegistrationContext(appContexts[i]);
+        }
+
+        return selfRegistrationContexts;
+    }
+
+    @Override
+    public ModulesManager getModulesManager(String appContext, boolean returnNullContexts) throws AuthException {
+        return new JAASModulesManager(getLogManager(), returnNullContexts, jaasConfigFile, properties, appContext);
+    }
+
+    @Override
+    public void refresh() {
+        jaasConfigFile.refresh();
+        super.refresh();
+    }
+
+    private RegistrationContext getRegistrationContext(String id) {
+        String layer = getLayer();
+        String appContext;
+
         if (id.toLowerCase(Locale.getDefault()).equals(DEFAULT_JAAS_APP_NAME)) {
             appContext = ALL_APPS;
         } else {
@@ -86,7 +95,7 @@ public abstract class JAASAuthConfigProvider extends BaseAuthConfigProvider {
 
         return new RegistrationContext() {
 
-            final String description = "JAAS AuthConfig: " + appContext;
+            String description = "JAAS AuthConfig: " + appContext;
 
             @Override
             public String getMessageLayer() {
@@ -108,27 +117,6 @@ public abstract class JAASAuthConfigProvider extends BaseAuthConfigProvider {
                 return false;
             }
         };
-    }
-
-    @Override
-    public AuthConfigFactory.RegistrationContext[] getSelfRegistrationContexts() {
-        final String[] appContexts = jaasConfig.getAppNames(getModuleTypes());
-        RegistrationContext[] rvalue = new RegistrationContext[appContexts.length];
-        for (int i = 0; i < appContexts.length; i++) {
-            rvalue[i] = getRegistrationContext(appContexts[i]);
-        }
-        return rvalue;
-    }
-
-    @Override
-    public ModulesManager getAuthContextHelper(String appContext, boolean returnNullContexts) throws AuthException {
-        return new JAASModulesManager(getLoggerName(), returnNullContexts, jaasConfig, properties, appContext);
-    }
-
-    @Override
-    public void refresh() {
-        jaasConfig.refresh();
-        super.refresh();
     }
 
 }

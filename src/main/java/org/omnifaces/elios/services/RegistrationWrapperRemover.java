@@ -14,13 +14,16 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  */
 
-package org.omnifaces.elios.services.config;
+package org.omnifaces.elios.services;
 
-/**
- * This is an interface for our callback handler context.
- *
- * @author Shing Wai Chan
- */
-public interface HandlerContext {
-    public String getRealmName();
+
+public interface RegistrationWrapperRemover {
+
+    /**
+     * remove the registration of the argument listener
+     *
+     * @param listener
+     */
+    void removeListener(AuthConfigRegistrationWrapper listener);
+
 }

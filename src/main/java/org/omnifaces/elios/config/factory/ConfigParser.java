@@ -16,58 +16,72 @@
 
 package org.omnifaces.elios.config.factory;
 
+import static java.util.Collections.emptySet;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
+import org.omnifaces.elios.data.AuthModulesLayerConfig;
+
+
 /**
- * AuthConfigImpl relies on a ConfigParser to read the module configuration.
+ * AuthConfigImpl relies on a ConfigParser to read
+ * the module configuration.
  *
- * <p>
- * The ConfigParser is expected to parse that information into the HashMap described below.
+ * <p> The ConfigParser is expected to parse that information
+ * into the HashMap described below.
  *
  * @version %I%, %G%
  */
 public interface ConfigParser {
 
     /**
-     * Initialize the parser. Passing null as argument means the parser is to find configuration object as necessary.
+     * Initialize the parser.
+     * Passing null as argument means the parser is to find
+     * configuration object as necessary.
      */
-    public void initialize(Object config) throws IOException;
+    default void initialize(Object config) throws IOException {
+        
+    }
 
     /**
-     * Get the module configuration information. The information is returned as a HashMap.
+     * Get the module configuration information.
+     * The information is returned as a Map.
      *
-     * <p>
-     * The key is an intercept:
+     * <p> The key is a layer:
      * <ul>
-     * <li>SOAP
-     * <li>HttpServlet
+     *   <li>SOAP
+     *   <li>HttpServlet
      * </ul>
      *
-     * <p>
-     * The value is a AuthConfigImpl.InterceptEntry, which contains:
+     * <p>The value is a AuthModulesLayerConfig, which contains:
+     *
      * <ul>
-     * <li>default provider ID
-     * <li>default type (client or server)
-     * <li>HashMap, where key = provider ID value = BaseAuthConfigImpl.IDEntry
+     *   <li> default default Client Module Id 
+     *   <li> default default Server Module Id 
+     *   <li> Map, where
+     *		    key	= auth module ID
+     *		    value = AuthModuleConfig
      * </ul>
      *
-     * <p>
-     * An IDEntry contains:
+     * <p> An AuthModuleConfig contains:
+     *
      * <ul>
-     * <li>type (client or server)
-     * <li>moduleClassName
-     * <li>default requestPolicy
-     * <li>default responsePolicy
-     * <li>options
-     * <li>
+     *   <li> moduleType (client or server)
+     *   <li> moduleClassName
+     *   <li> default requestPolicy
+     *   <li> default responsePolicy
+     *   <li> options
      * </ul>
      */
-    public Map getConfigMap();
+    Map<String, AuthModulesLayerConfig> getAuthModuleLayers();
 
     /**
-     * Get the name of layers with default set in domain.xml.
+     * Get the layers for which a default provider should be created when the
+     * parser is loaded.
      */
-    public Set<String> getLayersWithDefault();
+    default Set<String> getLayersWithDefault() {
+        return emptySet();
+    }
 }

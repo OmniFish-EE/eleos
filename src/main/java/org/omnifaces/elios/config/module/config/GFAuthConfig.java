@@ -1,6 +1,28 @@
+/*
+ * Copyright (c) 1997, 2018 Oracle and/or its affiliates. All rights reserved.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License v. 2.0, which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * This Source Code may also be made available under the following Secondary
+ * Licenses when the conditions for such availability set forth in the
+ * Eclipse Public License v. 2.0 are satisfied: GNU General Public License,
+ * version 2 with the GNU Classpath Exception, which is available at
+ * https://www.gnu.org/software/classpath/license.html.
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+ */
+
 package org.omnifaces.elios.config.module.config;
 
-import java.security.KeyStore.Entry;
+import static org.omnifaces.elios.config.helper.AuthMessagePolicy.getHttpServletPolicies;
+import static org.omnifaces.elios.config.helper.HttpServletConstants.HTTPSERVLET;
+import static org.omnifaces.elios.config.helper.HttpServletConstants.IS_MANDATORY;
+import static org.omnifaces.elios.config.helper.ModuleConfigurationManager.createAuthModuleInstance;
+import static org.omnifaces.elios.config.helper.ModuleConfigurationManager.getAuthModuleConfig;
+import static org.omnifaces.elios.config.helper.ModuleConfigurationManager.loadParser;
+
 import java.util.Map;
 
 import javax.security.auth.callback.CallbackHandler;
@@ -8,51 +30,41 @@ import javax.security.auth.message.AuthException;
 import javax.security.auth.message.MessageInfo;
 import javax.security.auth.message.MessagePolicy;
 import javax.security.auth.message.config.AuthConfig;
+import javax.security.auth.message.config.AuthConfigFactory;
 import javax.security.auth.message.config.AuthConfigProvider;
 
 import org.omnifaces.elios.config.helper.AuthMessagePolicy;
-import org.omnifaces.elios.config.helper.HttpServletConstants;
-import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
+import org.omnifaces.elios.data.AuthModuleBaseConfig;
 import org.omnifaces.elios.data.AuthModuleInstanceHolder;
 
 public class GFAuthConfig implements AuthConfig {
-    protected AuthConfigProvider provider = null;
-    protected String layer = null;
-    protected String appContext = null;
-    protected CallbackHandler handler = null;
-    protected String type = null;
-    protected String providerID = null;
-    protected boolean init = false;
-    protected boolean onePolicy = false;
 
-    protected GFAuthConfig(AuthConfigProvider provider, String layer, String appContext, CallbackHandler handler, String type) {
+    protected AuthConfigProvider provider;
+    protected String layer;
+    protected String appContext;
+    protected CallbackHandler handler;
+    protected String type;
+    protected String moduleId;
+    
+    protected boolean init;
+    protected boolean onePolicy;
+
+    protected AuthConfigFactory factory;
+
+    public GFAuthConfig(AuthConfigProvider provider, String layer, String appContext, CallbackHandler handler, String type) {
         this.provider = provider;
         this.layer = layer;
         this.appContext = appContext;
+        this.handler = handler != null ? handler : AuthMessagePolicy.getDefaultCallbackHandler();
         this.type = type;
-        if (handler == null) {
-            handler = AuthMessagePolicy.getDefaultCallbackHandler();
-//		this.newHandler = true;
-        }
-        this.handler = handler;
     }
 
-    /**
-     * Get the message layer name of this authentication context configuration object.
-     *
-     * @return the message layer name of this configuration object, or null if the configuration object pertains to an
-     * unspecified message layer.
-     */
+    @Override
     public String getMessageLayer() {
         return layer;
     }
 
-    /**
-     * Get the application context identifier of this authentication context configuration object.
-     *
-     * @return the String identifying the application context of this configuration object or null if the configuration
-     * object pertains to an unspecified application context.
-     */
+    @Override
     public String getAppContext() {
         return appContext;
     }
@@ -60,49 +72,43 @@ public class GFAuthConfig implements AuthConfig {
     /**
      * Get the authentication context identifier corresponding to the request and response objects encapsulated in
      * messageInfo.
-     * 
-     * See method AuthMessagePolicy. getHttpServletPolicies() for more details on why this method returns the String's
+     *
+     * See method AuthMessagePolicy. getHttpServletPolicies() for more details on why this method returns the Strings
      * "true" or "false" for AuthContextID.
      *
      * @param messageInfo a contextual Object that encapsulates the client request and server response objects.
      *
      * @return the authentication context identifier corresponding to the encapsulated request and response objects, or
      * null.
-     * 
      *
      * @throws IllegalArgumentException if the type of the message objects incorporated in messageInfo are not compatible
      * with the message types supported by this authentication context configuration object.
      */
+    @Override
     public String getAuthContextID(MessageInfo messageInfo) {
-        if (GFServerConfigProvider.HTTPSERVLET.equals(layer)) {
-            String isMandatoryStr = (String) messageInfo.getMap().get(HttpServletConstants.IS_MANDATORY);
-            return Boolean.valueOf(isMandatoryStr).toString();
-        } else {
-            return null;
+        if (HTTPSERVLET.equals(layer)) {
+            return Boolean.valueOf((String) messageInfo.getMap().get(IS_MANDATORY)).toString();
         }
+
+        return null;
     }
 
     // we should be able to replace the following with a method on packet
 
     /**
-     * Causes a dynamic anthentication context configuration object to update the internal state that it uses to process
+     * Causes a dynamic authentication context configuration object to update the internal state that it uses to process
      * calls to its <code>getAuthContext</code> method.
      *
-     * @exception AuthException if an error occured during the update.
+     * @exception AuthException if an error occurred during the update.
      *
      * @exception SecurityException if the caller does not have permission to refresh the configuration object.
      */
+    @Override
     public void refresh() {
         loadParser(provider, factory, null);
     }
 
-    /**
-     * Used to determine whether or not the <code>getAuthContext</code> method of the authentication context configuration
-     * will return null for all possible values of authentication context identifier.
-     *
-     * @return false when <code>getAuthContext</code> will return null for all possible values of authentication context
-     * identifier. Otherwise, this method returns true.
-     */
+    @Override
     public boolean isProtected() {
         // XXX TBD
         return true;
@@ -112,39 +118,34 @@ public class GFAuthConfig implements AuthConfig {
         return handler;
     }
 
-    protected AuthModuleInstanceHolder getModuleInfo(String authContextID, Map properties) throws AuthException {
+    protected AuthModuleInstanceHolder getAuthModuleInstanceHolder(String authContextID, Map<String, Object> properties) throws AuthException {
         if (!init) {
             initialize(properties);
         }
 
-        MessagePolicy[] policies = null;
+        // For now only HTTP supported. Add support for other layers in the future.
+        MessagePolicy[] policies = getHttpServletPolicies(authContextID);
 
-        if (GFServerConfigProvider.HTTPSERVLET.equals(layer)) {
-
-            policies = AuthMessagePolicy.getHttpServletPolicies(authContextID);
-
+        AuthModuleBaseConfig authModuleConfig = getAuthModuleConfig(layer, moduleId, policies[0], policies[1], type);
+        if (authModuleConfig == null) {
+            return null;
         }
 
-        MessagePolicy requestPolicy = policies[0];
-        MessagePolicy responsePolicy = policies[1];
-
-        Entry entry = getEntry(layer, providerID, requestPolicy, responsePolicy, type);
-
-        return (entry != null) ? createModuleInfo(entry, handler, type, properties) : null;
+        return createAuthModuleInstance(authModuleConfig, handler, type, properties);
     }
 
-    // lazy initialize this as SunWebApp is not available in
-    // RealmAdapter creation
-    private void initialize(Map properties) {
+    private void initialize(Map<String, ?> properties) {
         if (!init) {
-
-            if (GFServerConfigProvider.HTTPSERVLET.equals(layer)) {
-                providerID = null;
+            if (HTTPSERVLET.equals(layer)) {
+                moduleId = (String) properties.get("authModuleId");
                 onePolicy = true;
             }
 
-            // handlerContext need to be explictly set by caller
+            // HandlerContext need to be explicitly set by caller
             init = true;
         }
     }
+
+
+
 }
