@@ -70,4 +70,24 @@ public final class PriviledgedAccessController {
         }
         
     }
+    
+    public static <T> T privileged(PrivilegedAction<T> privilegedAction) {
+        if (hasSecurityManager) {
+            return AccessController.doPrivileged(privilegedAction);
+        }
+
+        return privilegedAction.run();
+    }
+
+    public static Object privileged(Runnable runnable) {
+        if (hasSecurityManager) {
+            return AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+                runnable.run();
+                return null;
+            });
+        }
+
+        runnable.run();
+        return null;
+    }
 }
