@@ -22,7 +22,6 @@ import java.util.List;
 import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
 import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
 import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
-import org.omnifaces.elios.services.WebServicesDelegate;
 
 /**
  * This class implements methods in the abstract class AuthConfigFactory.
@@ -88,14 +87,6 @@ public class DefaultConfigFactory extends BaseAuthConfigFactory {
      * Contains the default providers used when none are configured in a factory configuration file.
      */
     static List<AuthConfigProviderEntry> getDefaultProviders() {
-        WebServicesDelegate delegate = null;
-        
-        if (delegate != null) {
-            List<AuthConfigProviderEntry> entries = new ArrayList<AuthConfigProviderEntry>(2);
-            entries.add(new AuthConfigProviderEntry(delegate.getDefaultWebServicesProvider(), null));
-            entries.add(new AuthConfigProviderEntry(GFServerConfigProvider.class.getName(), null));
-            return entries;
-        }
         List<AuthConfigProviderEntry> entries = new ArrayList<AuthConfigProviderEntry>(1);
         entries.add(new AuthConfigProviderEntry(GFServerConfigProvider.class.getName(), null));
         return entries;
