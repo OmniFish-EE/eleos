@@ -10,10 +10,10 @@ import javax.security.auth.message.MessagePolicy;
 import javax.security.auth.message.config.AuthConfig;
 import javax.security.auth.message.config.AuthConfigProvider;
 
-import org.omnifaces.elios.config.data.AuthModuleInstanceHolder;
 import org.omnifaces.elios.config.helper.AuthMessagePolicy;
 import org.omnifaces.elios.config.helper.HttpServletConstants;
 import org.omnifaces.elios.config.module.configprovider.GFServerConfigProvider;
+import org.omnifaces.elios.data.AuthModuleInstanceHolder;
 
 public class GFAuthConfig implements AuthConfig {
     protected AuthConfigProvider provider = null;

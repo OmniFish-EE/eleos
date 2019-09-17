@@ -10,8 +10,8 @@ import javax.security.auth.message.config.ClientAuthConfig;
 import javax.security.auth.message.config.ClientAuthContext;
 import javax.security.auth.message.module.ClientAuthModule;
 
-import org.omnifaces.elios.config.data.AuthModuleInstanceHolder;
 import org.omnifaces.elios.config.module.context.GFClientAuthContext;
+import org.omnifaces.elios.data.AuthModuleInstanceHolder;
 
 public class GFClientAuthConfig extends GFAuthConfig implements ClientAuthConfig {
 

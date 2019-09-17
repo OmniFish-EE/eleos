@@ -41,13 +41,13 @@ import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.module.ClientAuthModule;
 import javax.security.auth.message.module.ServerAuthModule;
 
-import org.omnifaces.elios.config.data.AuthModuleBaseConfig;
-import org.omnifaces.elios.config.data.AuthModuleConfig;
-import org.omnifaces.elios.config.data.AuthModuleInstanceHolder;
-import org.omnifaces.elios.config.data.AuthModulesLayerConfig;
 import org.omnifaces.elios.config.factory.ConfigParser;
 import org.omnifaces.elios.config.module.config.GFClientAuthConfig;
 import org.omnifaces.elios.config.module.config.GFServerAuthConfig;
+import org.omnifaces.elios.data.AuthModuleBaseConfig;
+import org.omnifaces.elios.data.AuthModuleConfig;
+import org.omnifaces.elios.data.AuthModuleInstanceHolder;
+import org.omnifaces.elios.data.AuthModulesLayerConfig;
 import org.omnifaces.elios.services.WebServicesDelegate;
 
 /**

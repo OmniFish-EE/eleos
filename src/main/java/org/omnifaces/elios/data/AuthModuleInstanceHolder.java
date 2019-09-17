@@ -1,4 +1,4 @@
-package org.omnifaces.elios.config.data;
+package org.omnifaces.elios.data;
 
 import java.util.Map;
 

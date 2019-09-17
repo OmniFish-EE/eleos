@@ -10,8 +10,8 @@ import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
 import javax.security.auth.message.module.ServerAuthModule;
 
-import org.omnifaces.elios.config.data.AuthModuleInstanceHolder;
 import org.omnifaces.elios.config.module.context.GFServerAuthContext;
+import org.omnifaces.elios.data.AuthModuleInstanceHolder;
 
 public class GFServerAuthConfig extends GFAuthConfig implements ServerAuthConfig {
 
