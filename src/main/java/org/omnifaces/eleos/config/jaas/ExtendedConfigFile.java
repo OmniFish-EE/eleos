@@ -63,10 +63,6 @@ public class ExtendedConfigFile extends ConfigFile {
     public ExtendedConfigFile() {
     }
 
-    /**
-     *
-     * @param uri
-     */
     public ExtendedConfigFile(URI uri) {
         super(uri);
     }
@@ -97,7 +93,7 @@ public class ExtendedConfigFile extends ConfigFile {
      * by removing all names that are not associated via an AppConfigurationEntry with at least one LoginModule that
      * implements an authModuleClass.
      * @return String[] containing all the AppNames appearing in the config file.
-     * @throws SecurityException
+     * @throws SecurityException if no reflective access
      */
     public String[] getAppNames(final Class[] authModuleClass) {
 

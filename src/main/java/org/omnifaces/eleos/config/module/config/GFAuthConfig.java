@@ -99,9 +99,6 @@ public class GFAuthConfig implements AuthConfig {
      * Causes a dynamic authentication context configuration object to update the internal state that it uses to process
      * calls to its <code>getAuthContext</code> method.
      *
-     * @exception AuthException if an error occurred during the update.
-     *
-     * @exception SecurityException if the caller does not have permission to refresh the configuration object.
      */
     @Override
     public void refresh() {

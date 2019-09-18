@@ -147,8 +147,6 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      * registration from the provider.
      *
      * @exception SecurityException if the caller does not have permission to register a provider at the factory.
-     *
-     * @exception AuthException if the provider construction or registration fails.
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -277,8 +275,6 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
      * <p>
      * A factory should only replace an existing registration when a change of provider implementation class or
      * initialization properties has occurred.
-     *
-     * @exception AuthException if an error occurred during the reinitialization.
      *
      * @exception SecurityException if the caller does not have permission to refresh the factory.
      */

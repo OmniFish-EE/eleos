@@ -27,12 +27,12 @@ import javax.security.auth.message.MessagePolicy;
  * As an example, in GlassFish this would be expressed by the <code>provider-config</code> element in domain.xml:
  *
  * <pre>
- *  &lt;provider-config provider-type="server" provider-id="GFConsoleAuthModule" class-name="org.glassfish.admingui.common.security.AdminConsoleAuthModule">
- *    &lt;request-policy auth-source="sender">&lt;/request-policy>
- *    &lt;response-policy>&lt;/response-policy>
- *    &lt;property name="loginPage" value="/login.jsf">&lt;/property>
- *    &lt;property name="loginErrorPage" value="/loginError.jsf">&lt;/property>
- *  &lt;/provider-config>
+ *  &lt;provider-config provider-type="server" provider-id="GFConsoleAuthModule" class-name="org.glassfish.admingui.common.security.AdminConsoleAuthModule"&gt;
+ *    &lt;request-policy auth-source="sender"&lt;/request-policy&gt;
+ *    &lt;response-policy&gt;&lt;/response-policy&gt;
+ *    &lt;property name="loginPage" value="/login.jsf"&gt;&lt;/property&gt;
+ *    &lt;property name="loginErrorPage" value="/loginError.jsf"&lt;/property&gt;
+ *  &lt;/provider-config&gt;
  * </pre>
  *
  */

@@ -45,6 +45,7 @@ import javax.security.auth.message.config.ServerAuthConfig;
 import javax.security.auth.message.config.ServerAuthContext;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.omnifaces.eleos.config.factory.BaseAuthConfigFactory;
 import org.omnifaces.eleos.config.factory.file.AuthConfigFileFactory;
@@ -57,6 +58,7 @@ import static org.junit.Assert.*;
  *
  * @author Ron Monzillo
  */
+@Ignore
 public class FactoryTest {
 
     /** switch definition of default test factory to test native factory

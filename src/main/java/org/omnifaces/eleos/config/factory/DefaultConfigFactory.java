@@ -43,9 +43,11 @@ public class DefaultConfigFactory extends BaseAuthConfigFactory {
      * BaseAuthConfigFactory to serialize access to the regStore (both within the class constructor, and within getRegStore)
      *
      * <p>
-     * All EEntyInfo OBJECTS PASSED as deualtEntries MUST HAVE BEEN CONSTRUCTED USING THE FOLLOWING CONSTRUCTOR:
+     * All EntyInfo OBJECTS PASSED as defaultEntries MUST HAVE BEEN CONSTRUCTED USING THE FOLLOWING CONSTRUCTOR:
      *
-     * EntryInfo(String className, Map<String, String> properties);
+     * <code>
+     * EntryInfo(String className, Map&lt;String, String&gt; properties);
+     * </code>
      *
      */
     public DefaultConfigFactory() {

@@ -16,9 +16,10 @@
 
 package org.omnifaces.eleos.config.helper;
 
+import java.util.Map;
+
 import javax.security.auth.message.AuthException;
 import javax.security.auth.message.AuthStatus;
-import java.util.Map;
 
 /**
  * The modules manager
@@ -49,51 +50,14 @@ public abstract class ModulesManager {
         }
     }
 
-    /**
-     *
-     * @param <M>
-     * @param template
-     * @param authContextID
-     * @return
-     * @throws AuthException
-     */
     public abstract <M> boolean hasModules(M[] template, String authContextID) throws AuthException;
 
-    /**
-     *
-     * @param <M>
-     * @param template
-     * @param authContextID
-     * @return
-     * @throws AuthException
-     */
     public abstract <M> M[] getModules(M[] template, String authContextID) throws AuthException;
 
-    /**
-     *
-     * @param moduleNumber
-     * @param properties
-     * @return
-     */
     public abstract Map<String, ?> getInitProperties(int moduleNumber, Map<String, ?> properties);
 
-    /**
-     *
-     * @param successValue
-     * @param moduleNumber
-     * @param moduleStatus
-     * @return
-     */
     public abstract boolean shouldStopProcessingModules(AuthStatus[] successValue, int moduleNumber, AuthStatus moduleStatus);
 
-    /**
-     *
-     * @param successValue
-     * @param defaultFailStatus
-     * @param status
-     * @param position
-     * @return
-     */
     public abstract AuthStatus getReturnStatus(AuthStatus[] successValue, AuthStatus defaultFailStatus, AuthStatus[] status, int position);
 
     public abstract void refresh();

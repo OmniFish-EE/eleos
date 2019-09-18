@@ -34,10 +34,13 @@ public class AuthConfigFileFactory extends BaseAuthConfigFactory {
      * contains an implementation of the getRegStore method.
      *
      * <p>
-     * All EentyInfo OBJECTS PASSED as default Entries MUST HAVE BEEN CONSTRUCTED USING THE FOLLOWING CONSTRUCTOR: <code>
-     * EntryInfo(String className, Map<String, String> properties);
+     * All EntyInfo OBJECTS PASSED as default Entries MUST HAVE BEEN CONSTRUCTED USING THE FOLLOWING CONSTRUCTOR: 
+     * 
+     * <pre>
+     * <code>
+     * EntryInfo(String className, Map&lt;String, String&gt; properties);
      * </code>
-     * </p>
+     * </pre>
      *
      */
     public AuthConfigFileFactory() {

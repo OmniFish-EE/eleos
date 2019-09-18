@@ -107,11 +107,11 @@ public class JAASModulesManager extends ModulesManager {
     /**
      * This implementation does not depend on authContextID
      *
-     * @param <M>
-     * @param template
+     * @param <M> Type of the template
+     * @param template the template used to create the module
      * @param authContextID (ignored by this context system)
-     * @return
-     * @throws AuthException
+     * @return true if has modules
+     * @throws AuthException if something goes wrong
      */
     @Override
     public <M> boolean hasModules(M[] template, String authContextID) throws AuthException {
@@ -129,11 +129,11 @@ public class JAASModulesManager extends ModulesManager {
     /**
      * this implementation does not depend on authContextID
      *
-     * @param <M>
-     * @param template
+     * @param <M> Type of the template
+     * @param template template the template used to create the module
      * @param authContextID (ignored by this context system)
-     * @return
-     * @throws AuthException
+     * @return the modules 
+     * @throws AuthException if something goes wrong
      */
     @Override
     public <M> M[] getModules(M[] template, String authContextID) throws AuthException {

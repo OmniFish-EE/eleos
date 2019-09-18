@@ -67,8 +67,8 @@ public class LogManager {
 
     /**
      *
-     * @param level
-     * @return
+     * @param level the level to get the logger at
+     * @return the logger if the level is loggable, otherwise null
      */
     protected Logger getLogger(Level level) {
         Logger logger = Logger.getLogger(loggerName);
