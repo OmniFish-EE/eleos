@@ -46,10 +46,10 @@ import javax.security.auth.message.config.ServerAuthContext;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.omnifaces.elios.config.factory.BaseAuthConfigFactory;
-import org.omnifaces.elios.config.factory.file.AuthConfigFileFactory;
-import org.omnifaces.elios.config.factory.file.AuthConfigProviderEntry;
-import org.omnifaces.elios.config.factory.file.RegStoreFileParser;
+import org.omnifaces.eleos.config.factory.BaseAuthConfigFactory;
+import org.omnifaces.eleos.config.factory.file.AuthConfigFileFactory;
+import org.omnifaces.eleos.config.factory.file.AuthConfigProviderEntry;
+import org.omnifaces.eleos.config.factory.file.RegStoreFileParser;
 
 import static org.junit.Assert.*;
 
@@ -333,16 +333,16 @@ public class FactoryTest {
          * test class would need to import EntryInfo (which it can't).
          */
         public _ExtendsBaseAuthConfigFactory() {
-            rLock.lock();
+            ////rLock.lock();
             try {
                 if (regStore != null) {
                     return;
                 }
             } finally {
-                rLock.unlock();
+                //rLock.unlock();
             }
             String userDir = System.getProperty("user.dir");
-            wLock.lock();
+            //wLock.lock();
             try {
                 if (regStore == null) {
                     AuthConfigProviderEntry e = new AuthConfigProviderEntry(_AuthConfigProvider.class.getName(),null);
@@ -353,7 +353,7 @@ public class FactoryTest {
                     _loadFactory();
                 }
             } finally {
-                wLock.unlock();
+                //wLock.unlock();
             }
             RegStoreFileParser rS = getRegStore();
             assertTrue(rS == _ExtendsBaseAuthConfigFactory.regStore);
@@ -361,11 +361,11 @@ public class FactoryTest {
 
         @Override
         protected RegStoreFileParser getRegStore() {
-            rLock.lock();
+            ////rLock.lock();
             try {
                 return regStore;
             } finally {
-                rLock.unlock();
+                //rLock.unlock();
             }
         }
     }
@@ -384,16 +384,16 @@ public class FactoryTest {
          * test class would need to import EntryInfo (which it can't).
          */
         public _Extends_ExtendsAuthConfigFactory() {
-            rLock.lock();
+            ////rLock.lock();
             try {
                 if (regStore != null) {
                     return;
                 }
             } finally {
-                rLock.unlock();
+                //rLock.unlock();
             }
             String userDir = System.getProperty("user.dir");
-            wLock.lock();
+            //wLock.lock();
             try {
                 if (regStore == null) {
                     AuthConfigProviderEntry e = new AuthConfigProviderEntry(_AuthConfigProvider.class.getName(),null);
@@ -404,7 +404,7 @@ public class FactoryTest {
                     _loadFactory();
                 }
             } finally {
-                wLock.unlock();
+                //wLock.unlock();
             }
             RegStoreFileParser rS = getRegStore();
             assertTrue(rS == _Extends_ExtendsAuthConfigFactory.regStore);
@@ -412,11 +412,11 @@ public class FactoryTest {
 
         @Override
         protected RegStoreFileParser getRegStore() {
-            rLock.lock();
+            //rLock.lock();
             try {
                 return regStore;
             } finally {
-                rLock.unlock();
+                //rLock.unlock();
             }
         }
     }
