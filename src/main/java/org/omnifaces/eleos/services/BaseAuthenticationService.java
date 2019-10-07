@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Function;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.CallbackHandler;
@@ -227,15 +226,11 @@ public class BaseAuthenticationService {
        return AuthMessagePolicy.getDefaultCallbackHandler();
     }
     
-    public Caller validateRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, boolean calledFromAuthenticate, Function<HttpServletRequest, Boolean> isMandatoryFn) throws IOException {
-        boolean isMandatory = true;
-        
+    public Caller validateRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, boolean calledFromAuthenticate, boolean isMandatory) throws IOException {
         Subject subject = new Subject();
         MessageInfo messageInfo = new HttpMessageInfo(servletRequest, servletResponse);
         
         try {
-            isMandatory = isMandatoryFn.apply(servletRequest);
-
             if (isMandatory || calledFromAuthenticate) {
                 setMandatory(messageInfo);
             }
