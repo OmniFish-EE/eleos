@@ -21,7 +21,7 @@
 
     <groupId>org.omnifaces</groupId>
     <artifactId>eleos</artifactId>
-    <version>0.2-SNAPSHOT</version>
+    <version>0.2</version>
 
     <name>Eleos</name>
     <description>
