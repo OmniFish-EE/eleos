@@ -230,9 +230,7 @@ public class BaseAuthenticationService {
     
     public Caller validateRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, boolean calledFromAuthenticate, boolean isMandatory) throws IOException {
         Subject subject = new Subject();
-        MessageInfo messageInfo = new HttpMessageInfo(servletRequest, servletResponse);
-        
-        saveMessageInfo(servletRequest, messageInfo);
+        MessageInfo messageInfo = getMessageInfo(servletRequest, servletResponse);
         
         try {
             if (isMandatory || calledFromAuthenticate) {
@@ -252,9 +250,28 @@ public class BaseAuthenticationService {
         return null;
     }
     
+    public HttpServletRequest getWrappedRequestIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        return (HttpServletRequest) getMessageInfo(servletRequest, servletResponse).getRequestMessage();
+    }
+    
+    public HttpServletResponse getWrappedResponseIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        return (HttpServletResponse) getMessageInfo(servletRequest, servletResponse).getResponseMessage();
+    }
+    
     @SuppressWarnings("unchecked")
     private void setMandatory(MessageInfo messageInfo) {
         messageInfo.getMap().put(IS_MANDATORY, TRUE.toString());
+    }
+    
+    private MessageInfo getMessageInfo(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        MessageInfo messageInfo = (MessageInfo) servletRequest.getAttribute(MESSAGE_INFO);
+        if (messageInfo == null) {
+            messageInfo = new HttpMessageInfo(servletRequest, servletResponse);
+            
+            saveMessageInfo(servletRequest, messageInfo);
+        }
+        
+        return messageInfo;
     }
     
     private void saveMessageInfo(HttpServletRequest servletRequest, MessageInfo messageInfo) {
