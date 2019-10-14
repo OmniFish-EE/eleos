@@ -53,6 +53,8 @@ public class BaseAuthenticationService {
 
     protected static final AuthConfigFactory factory = AuthConfigFactory.getFactory();
 
+    private static final String MESSAGE_INFO = BaseAuthenticationService.class.getName() + ".message.info";
+    
     private ReadWriteLock readWriteLock;
     private Lock readLock;
     private Lock writeLock;
@@ -230,6 +232,8 @@ public class BaseAuthenticationService {
         Subject subject = new Subject();
         MessageInfo messageInfo = new HttpMessageInfo(servletRequest, servletResponse);
         
+        saveMessageInfo(servletRequest, messageInfo);
+        
         try {
             if (isMandatory || calledFromAuthenticate) {
                 setMandatory(messageInfo);
@@ -252,7 +256,9 @@ public class BaseAuthenticationService {
     private void setMandatory(MessageInfo messageInfo) {
         messageInfo.getMap().put(IS_MANDATORY, TRUE.toString());
     }
-
-
+    
+    private void saveMessageInfo(HttpServletRequest servletRequest, MessageInfo messageInfo) {
+        servletRequest.setAttribute(MESSAGE_INFO, messageInfo);
+    }
 
 }
