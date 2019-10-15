@@ -19,7 +19,6 @@ package org.omnifaces.eleos.services;
 
 import static java.lang.Boolean.TRUE;
 import static javax.security.auth.message.AuthStatus.SUCCESS;
-import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static org.omnifaces.eleos.config.helper.HttpServletConstants.IS_MANDATORY;
 
 import java.io.IOException;
@@ -244,10 +243,8 @@ public class BaseAuthenticationService {
             return Caller.fromSubject(subject);
 
         } catch (AuthException | RuntimeException e) {
-            servletResponse.setStatus(SC_INTERNAL_SERVER_ERROR);
+            throw new IllegalStateException(e);
         }
-        
-        return null;
     }
     
     public HttpServletRequest getWrappedRequestIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
@@ -257,6 +254,31 @@ public class BaseAuthenticationService {
     public HttpServletResponse getWrappedResponseIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         return (HttpServletResponse) getMessageInfo(servletRequest, servletResponse).getResponseMessage();
     }
+    
+    public void secureResponse(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        MessageInfo messageInfo = getMessageInfo(servletRequest, servletResponse);
+        
+        try {
+            getServerAuthContext(messageInfo).secureResponse(messageInfo, null);
+        } catch (AuthException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+    
+    public void clearSubject(HttpServletRequest servletRequest, HttpServletResponse servletResponse, Subject subject) {
+        MessageInfo messageInfo = getMessageInfo(servletRequest, servletResponse);
+        
+        try {
+            getServerAuthContext(messageInfo).cleanSubject(messageInfo, subject);
+        } catch (AuthException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+    
+    
+    
+    // ### Private methods
+    
     
     @SuppressWarnings("unchecked")
     private void setMandatory(MessageInfo messageInfo) {
