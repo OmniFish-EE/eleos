@@ -20,6 +20,7 @@ package org.omnifaces.eleos.services;
 import static java.lang.Boolean.TRUE;
 import static javax.security.auth.message.AuthStatus.SUCCESS;
 import static org.omnifaces.eleos.config.helper.HttpServletConstants.IS_MANDATORY;
+import static org.omnifaces.eleos.config.helper.HttpServletConstants.REGISTER_SESSION;
 
 import java.io.IOException;
 import java.util.Map;
@@ -247,6 +248,10 @@ public class BaseAuthenticationService {
         }
     }
     
+    public boolean mustRegisterSession(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        return isRegisterSession(getMessageInfo(servletRequest, servletResponse));
+    }
+    
     public HttpServletRequest getWrappedRequestIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         return (HttpServletRequest) getMessageInfo(servletRequest, servletResponse).getRequestMessage();
     }
@@ -277,8 +282,12 @@ public class BaseAuthenticationService {
     
     
     
+    
     // ### Private methods
     
+    private boolean isRegisterSession(MessageInfo messageInfo) {
+        return Boolean.valueOf((String) messageInfo.getMap().get(REGISTER_SESSION));
+    }
     
     @SuppressWarnings("unchecked")
     private void setMandatory(MessageInfo messageInfo) {
