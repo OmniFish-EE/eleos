@@ -27,7 +27,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.logging.Logger;
 
-import javax.security.auth.message.AuthException;
+import jakarta.security.auth.message.AuthException;
 
 import org.omnifaces.eleos.config.factory.ConfigParser;
 
