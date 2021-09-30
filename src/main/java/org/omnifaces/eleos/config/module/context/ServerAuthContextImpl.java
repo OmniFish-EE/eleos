@@ -45,19 +45,12 @@ public class ServerAuthContextImpl implements ServerAuthContext {
     private final static AuthStatus[] secureResponseSuccessValues = { SEND_SUCCESS };
 
     private String loggerName;
-
     private ModulesManager modulesManager;
-
     private MessagePolicyDelegate policyDelegate;
-
     private String appContext;
-
     private CallbackHandler callbackHandler;
-
     private String authContextID;
-
     private Map<String, ?> properties;
-
     private ServerAuthModule[] serverAuthModules;
 
 

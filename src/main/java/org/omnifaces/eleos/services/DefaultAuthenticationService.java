@@ -29,9 +29,9 @@ import org.omnifaces.eleos.config.module.configprovider.GFServerConfigProvider;
 
 public class DefaultAuthenticationService extends BaseAuthenticationService {
 
-    public DefaultAuthenticationService(String appContext, Map<String, Object> map, ConfigParser parser, CallbackHandler callbackHandler) {
+    public DefaultAuthenticationService(String appContextId, Map<String, Object> properties, ConfigParser parser, CallbackHandler callbackHandler) {
 
-        init(HTTPSERVLET, appContext, map, callbackHandler, null);
+        init(HTTPSERVLET, appContextId, properties, callbackHandler, null);
         
         ModuleConfigurationManager.init(parser, factory, new GFServerConfigProvider(factory));
 
@@ -39,8 +39,8 @@ public class DefaultAuthenticationService extends BaseAuthenticationService {
             setRegistrationId(
                 factory.registerConfigProvider(
                     new GFServerConfigProvider(factory), 
-                    HTTPSERVLET, appContext,
-                    "Eleos provider: " + HTTPSERVLET + ":" + appContext));
+                    HTTPSERVLET, appContextId,
+                    "Eleos provider: " + HTTPSERVLET + ":" + appContextId));
         }
 
     }

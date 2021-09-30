@@ -92,7 +92,7 @@ public abstract class BaseAuthConfigImpl implements AuthConfig {
     private void initialize() throws AuthException {
         instanceWriteLock.lock();
         try {
-            this.epoch = providerEpoch.getEpoch();
+            epoch = providerEpoch.getEpoch();
             initializeContextMap();
         } finally {
             instanceWriteLock.unlock();
@@ -139,8 +139,7 @@ public abstract class BaseAuthConfigImpl implements AuthConfig {
     }
 
     @SuppressWarnings("unchecked")
-    protected final <M> M getContext(Map<String, Map<Integer, M>> contextMap, String authContextID, Subject subject,
-            Map<String, ?> properties)
+    protected final <M> M getContext(Map<String, Map<Integer, M>> contextMap, String authContextID, Subject subject, Map<String, ?> properties)
             throws AuthException {
 
         M context = null;
