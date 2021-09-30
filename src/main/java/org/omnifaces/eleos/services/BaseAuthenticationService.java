@@ -60,15 +60,15 @@ public class BaseAuthenticationService {
     private Lock writeLock;
 
     protected String layer;
-    protected String appCtxt;
+    protected String appContextID;
     protected Map<String, ?> map;
     protected CallbackHandler callbackHandler;
     protected AuthConfigRegistrationWrapper listenerWrapper;
 
-    protected void init(String layer, String appContext, Map<String, ?> map, CallbackHandler callbackHandler, RegistrationWrapperRemover removerDelegate) {
+    protected void init(String layer, String appContextID, Map<String, ?> properties, CallbackHandler callbackHandler, RegistrationWrapperRemover removerDelegate) {
         this.layer = layer;
-        this.appCtxt = appContext;
-        this.map = map;
+        this.appContextID = appContextID;
+        this.map = properties;
         this.callbackHandler = callbackHandler;
         if (this.callbackHandler == null) {
             this.callbackHandler = getCallbackHandler();
@@ -78,7 +78,7 @@ public class BaseAuthenticationService {
         this.readLock = readWriteLock.readLock();
         this.writeLock = readWriteLock.writeLock();
 
-        listenerWrapper = new AuthConfigRegistrationWrapper(this.layer, this.appCtxt, removerDelegate);
+        listenerWrapper = new AuthConfigRegistrationWrapper(this.layer, this.appContextID, removerDelegate);
     }
 
     public void setRegistrationId(String registrationId) {
@@ -106,7 +106,7 @@ public class BaseAuthenticationService {
     }
 
     public String getAppContextID() {
-        return appCtxt;
+        return appContextID;
     }
 
     public ClientAuthConfig getClientAuthConfig() throws AuthException {
@@ -144,9 +144,9 @@ public class BaseAuthenticationService {
 
         if (authConfigProvider != null) {
             if (isServer) {
-                authConfig = authConfigProvider.getServerAuthConfig(layer, appCtxt, callbackHandler);
+                authConfig = authConfigProvider.getServerAuthConfig(layer, appContextID, callbackHandler);
             } else {
-                authConfig = authConfigProvider.getClientAuthConfig(layer, appCtxt, callbackHandler);
+                authConfig = authConfigProvider.getClientAuthConfig(layer, appContextID, callbackHandler);
             }
         }
 
@@ -183,7 +183,7 @@ public class BaseAuthenticationService {
             try {
                 writeLock.lock();
                 if (listenerWrapper.getConfigData() == null) {
-                    AuthConfigProvider nextConfigProvider = factory.getConfigProvider(layer, appCtxt, getRegistrationListener());
+                    AuthConfigProvider nextConfigProvider = factory.getConfigProvider(layer, appContextID, getRegistrationListener());
 
                     if (nextConfigProvider != null) {
                         listenerWrapper.setConfigData(new ConfigData(nextConfigProvider, getAuthConfig(nextConfigProvider, isServer)));
@@ -201,17 +201,17 @@ public class BaseAuthenticationService {
     }
 
     /**
-     * Check if there is a provider register for a given layer and appCtxt.
+     * Check if there is a provider register for a given layer and appContextID.
      */
     protected boolean hasExactMatchAuthProvider() {
         boolean exactMatch = false;
 
-        AuthConfigProvider configProvider = factory.getConfigProvider(layer, appCtxt, null);
+        AuthConfigProvider configProvider = factory.getConfigProvider(layer, appContextID, null);
 
         if (configProvider != null) {
             for (String registrationId : factory.getRegistrationIDs(configProvider)) {
                 RegistrationContext registrationContext = factory.getRegistrationContext(registrationId);
-                if (layer.equals(registrationContext.getMessageLayer()) && appCtxt.equals(registrationContext.getAppContext())) {
+                if (layer.equals(registrationContext.getMessageLayer()) && appContextID.equals(registrationContext.getAppContext())) {
                     exactMatch = true;
                     break;
                 }

@@ -54,18 +54,14 @@ public class JAASModulesManager extends ModulesManager {
     private static final Object[] ARGS = {};
 
     private LogManager logManager;
-
     private ExtendedConfigFile jaasConfig;
-
     private final String appContext;
 
     // may be more than one delegate for a given jaas config file
     private ReentrantReadWriteLock instanceReadWriteLock = new ReentrantReadWriteLock();
-
     private Lock instanceWriteLock = instanceReadWriteLock.writeLock();
 
     private AppConfigurationEntry[] appConfigurationEntry;
-
     private Constructor<?>[] loginModuleConstructors;
 
     public JAASModulesManager(LogManager logManager, boolean returnNullContexts, ExtendedConfigFile jaasConfig, Map<String, ?> properties, String appContext) throws AuthException {
@@ -98,8 +94,7 @@ public class JAASModulesManager extends ModulesManager {
     }
 
     @Override
-    public
-    final void refresh() {
+    public final void refresh() {
         jaasConfig.refresh();
         initialize();
     }
