@@ -17,8 +17,8 @@
 package org.omnifaces.eleos.services;
 
 
-import static java.lang.Boolean.TRUE;
 import static jakarta.security.auth.message.AuthStatus.SUCCESS;
+import static java.lang.Boolean.TRUE;
 import static org.omnifaces.eleos.config.helper.HttpServletConstants.IS_MANDATORY;
 import static org.omnifaces.eleos.config.helper.HttpServletConstants.REGISTER_SESSION;
 
@@ -29,9 +29,17 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+
+import org.omnifaces.eleos.config.helper.AuthMessagePolicy;
+import org.omnifaces.eleos.config.helper.Caller;
+import org.omnifaces.eleos.config.servlet.HttpMessageInfo;
+
 import jakarta.security.auth.message.AuthException;
 import jakarta.security.auth.message.MessageInfo;
+import jakarta.security.auth.message.callback.PasswordValidationCallback;
 import jakarta.security.auth.message.config.AuthConfig;
 import jakarta.security.auth.message.config.AuthConfigFactory;
 import jakarta.security.auth.message.config.AuthConfigFactory.RegistrationContext;
@@ -43,31 +51,27 @@ import jakarta.security.auth.message.config.ServerAuthContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.omnifaces.eleos.config.helper.AuthMessagePolicy;
-import org.omnifaces.eleos.config.helper.Caller;
-import org.omnifaces.eleos.config.servlet.HttpMessageInfo;
-
 /**
  */
 public class BaseAuthenticationService {
 
-    protected static final AuthConfigFactory factory = AuthConfigFactory.getFactory();
+    protected static final AuthConfigFactory authConfigFactory = AuthConfigFactory.getFactory();
 
     private static final String MESSAGE_INFO = BaseAuthenticationService.class.getName() + ".message.info";
-    
+
     private ReadWriteLock readWriteLock;
     private Lock readLock;
     private Lock writeLock;
 
-    protected String layer;
-    protected String appContextID;
+    protected String messageLayer;
+    protected String appContextId;
     protected Map<String, ?> map;
     protected CallbackHandler callbackHandler;
     protected AuthConfigRegistrationWrapper listenerWrapper;
 
-    protected void init(String layer, String appContextID, Map<String, ?> properties, CallbackHandler callbackHandler, RegistrationWrapperRemover removerDelegate) {
-        this.layer = layer;
-        this.appContextID = appContextID;
+    protected void init(String messageLayer, String appContextId, Map<String, ?> properties, CallbackHandler callbackHandler, RegistrationWrapperRemover removerDelegate) {
+        this.messageLayer = messageLayer;
+        this.appContextId = appContextId;
         this.map = properties;
         this.callbackHandler = callbackHandler;
         if (this.callbackHandler == null) {
@@ -78,7 +82,7 @@ public class BaseAuthenticationService {
         this.readLock = readWriteLock.readLock();
         this.writeLock = readWriteLock.writeLock();
 
-        listenerWrapper = new AuthConfigRegistrationWrapper(this.layer, this.appContextID, removerDelegate);
+        listenerWrapper = new AuthConfigRegistrationWrapper(this.messageLayer, this.appContextId, removerDelegate);
     }
 
     public void setRegistrationId(String registrationId) {
@@ -106,7 +110,7 @@ public class BaseAuthenticationService {
     }
 
     public String getAppContextID() {
-        return appContextID;
+        return appContextId;
     }
 
     public ClientAuthConfig getClientAuthConfig() throws AuthException {
@@ -125,7 +129,7 @@ public class BaseAuthenticationService {
 
         return null;
     }
-    
+
     public ServerAuthContext getServerAuthContext(MessageInfo info) throws AuthException {
         return getServerAuthContext(info, null);
     }
@@ -144,9 +148,9 @@ public class BaseAuthenticationService {
 
         if (authConfigProvider != null) {
             if (isServer) {
-                authConfig = authConfigProvider.getServerAuthConfig(layer, appContextID, callbackHandler);
+                authConfig = authConfigProvider.getServerAuthConfig(messageLayer, appContextId, callbackHandler);
             } else {
-                authConfig = authConfigProvider.getClientAuthConfig(layer, appContextID, callbackHandler);
+                authConfig = authConfigProvider.getClientAuthConfig(messageLayer, appContextId, callbackHandler);
             }
         }
 
@@ -154,7 +158,6 @@ public class BaseAuthenticationService {
     }
 
     protected AuthConfig getAuthConfig(boolean isServer) throws AuthException {
-
         ConfigData configData = null;
         AuthConfig authConfig = null;
         boolean disabled = false;
@@ -183,7 +186,7 @@ public class BaseAuthenticationService {
             try {
                 writeLock.lock();
                 if (listenerWrapper.getConfigData() == null) {
-                    AuthConfigProvider nextConfigProvider = factory.getConfigProvider(layer, appContextID, getRegistrationListener());
+                    AuthConfigProvider nextConfigProvider = authConfigFactory.getConfigProvider(messageLayer, appContextId, getRegistrationListener());
 
                     if (nextConfigProvider != null) {
                         listenerWrapper.setConfigData(new ConfigData(nextConfigProvider, getAuthConfig(nextConfigProvider, isServer)));
@@ -206,12 +209,12 @@ public class BaseAuthenticationService {
     protected boolean hasExactMatchAuthProvider() {
         boolean exactMatch = false;
 
-        AuthConfigProvider configProvider = factory.getConfigProvider(layer, appContextID, null);
+        AuthConfigProvider configProvider = authConfigFactory.getConfigProvider(messageLayer, appContextId, null);
 
         if (configProvider != null) {
-            for (String registrationId : factory.getRegistrationIDs(configProvider)) {
-                RegistrationContext registrationContext = factory.getRegistrationContext(registrationId);
-                if (layer.equals(registrationContext.getMessageLayer()) && appContextID.equals(registrationContext.getAppContext())) {
+            for (String registrationId : authConfigFactory.getRegistrationIDs(configProvider)) {
+                RegistrationContext registrationContext = authConfigFactory.getRegistrationContext(registrationId);
+                if (messageLayer.equals(registrationContext.getMessageLayer()) && appContextId.equals(registrationContext.getAppContext())) {
                     exactMatch = true;
                     break;
                 }
@@ -227,11 +230,33 @@ public class BaseAuthenticationService {
     protected CallbackHandler getCallbackHandler() {
        return AuthMessagePolicy.getDefaultCallbackHandler();
     }
-    
+
+    public Caller login(String username, String password) {
+        Subject subject = new Subject();
+
+        try {
+            PasswordValidationCallback passwordValidation =
+                new PasswordValidationCallback(subject,
+                    username,
+                    password.toCharArray());
+
+            callbackHandler.handle(new Callback[] { passwordValidation });
+
+            if (passwordValidation.getResult()) {
+                return Caller.fromSubject(subject);
+            }
+
+            return null;
+
+        } catch (UnsupportedCallbackException | RuntimeException | IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public Caller validateRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse, boolean calledFromAuthenticate, boolean isMandatory) throws IOException {
         Subject subject = new Subject();
         MessageInfo messageInfo = getMessageInfo(servletRequest, servletResponse);
-        
+
         try {
             if (isMandatory || calledFromAuthenticate) {
                 setMandatory(messageInfo);
@@ -240,71 +265,71 @@ public class BaseAuthenticationService {
             if (!SUCCESS.equals(getServerAuthContext(messageInfo).validateRequest(messageInfo, subject, null))) {
                 return null;
             }
-            
+
             return Caller.fromSubject(subject);
 
         } catch (AuthException | RuntimeException e) {
             throw new IllegalStateException(e);
         }
     }
-    
+
     public boolean mustRegisterSession(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         return isRegisterSession(getMessageInfo(servletRequest, servletResponse));
     }
-    
+
     public HttpServletRequest getWrappedRequestIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         return (HttpServletRequest) getMessageInfo(servletRequest, servletResponse).getRequestMessage();
     }
-    
+
     public HttpServletResponse getWrappedResponseIfSet(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         return (HttpServletResponse) getMessageInfo(servletRequest, servletResponse).getResponseMessage();
     }
-    
+
     public void secureResponse(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         MessageInfo messageInfo = getMessageInfo(servletRequest, servletResponse);
-        
+
         try {
             getServerAuthContext(messageInfo).secureResponse(messageInfo, null);
         } catch (AuthException e) {
             throw new IllegalStateException(e);
         }
     }
-    
+
     public void clearSubject(HttpServletRequest servletRequest, HttpServletResponse servletResponse, Subject subject) {
         MessageInfo messageInfo = getMessageInfo(servletRequest, servletResponse);
-        
+
         try {
             getServerAuthContext(messageInfo).cleanSubject(messageInfo, subject);
         } catch (AuthException e) {
             throw new IllegalStateException(e);
         }
     }
-    
-    
-    
-    
+
+
+
+
     // ### Private methods
-    
+
     private boolean isRegisterSession(MessageInfo messageInfo) {
         return Boolean.valueOf((String) messageInfo.getMap().get(REGISTER_SESSION));
     }
-    
+
     @SuppressWarnings("unchecked")
     private void setMandatory(MessageInfo messageInfo) {
         messageInfo.getMap().put(IS_MANDATORY, TRUE.toString());
     }
-    
+
     private MessageInfo getMessageInfo(HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         MessageInfo messageInfo = (MessageInfo) servletRequest.getAttribute(MESSAGE_INFO);
         if (messageInfo == null) {
             messageInfo = new HttpMessageInfo(servletRequest, servletResponse);
-            
+
             saveMessageInfo(servletRequest, messageInfo);
         }
-        
+
         return messageInfo;
     }
-    
+
     private void saveMessageInfo(HttpServletRequest servletRequest, MessageInfo messageInfo) {
         servletRequest.setAttribute(MESSAGE_INFO, messageInfo);
     }

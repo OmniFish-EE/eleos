@@ -21,7 +21,7 @@
 
     <groupId>org.omnifaces</groupId>
     <artifactId>eleos</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.1</version>
 
     <name>Eleos</name>
     <description>
@@ -153,6 +153,8 @@
                         </goals>
                         <configuration>
                             <additionalJOption>-Xdoclint:none</additionalJOption>
+                            <quiet>true</quiet>
+                            <source>8</source>
                             <notimestamp>true</notimestamp>
                             <splitindex>true</splitindex>
                             <doctitle>Eleos API documentation</doctitle>

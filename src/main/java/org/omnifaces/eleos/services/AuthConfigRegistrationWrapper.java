@@ -44,7 +44,7 @@ public class AuthConfigRegistrationWrapper {
         this.rwLock = new ReentrantReadWriteLock(true);
         this.wLock = rwLock.writeLock();
 
-        enabled = BaseAuthenticationService.factory != null;
+        enabled = BaseAuthenticationService.authConfigFactory != null;
         listener = new AuthConfigRegistrationListener(layer, applicationContextId);
     }
 
@@ -66,10 +66,10 @@ public class AuthConfigRegistrationWrapper {
             data = null;
         }
 
-        if (BaseAuthenticationService.factory != null) {
-            BaseAuthenticationService.factory.detachListener(this.listener, layer, applicationContextId);
+        if (BaseAuthenticationService.authConfigFactory != null) {
+            BaseAuthenticationService.authConfigFactory.detachListener(this.listener, layer, applicationContextId);
             if (getJaspicProviderRegistrationId() != null) {
-                BaseAuthenticationService.factory.removeRegistration(getJaspicProviderRegistrationId());
+                BaseAuthenticationService.authConfigFactory.removeRegistration(getJaspicProviderRegistrationId());
             }
         }
     }
