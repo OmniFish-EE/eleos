@@ -164,6 +164,10 @@ public class InMemoryStore {
      * @return the credential validation result.
      */
     public static Caller validate(String callerName, String password) {
+        if (callerName == null) {
+            return null;
+        }
+
         Credential credential = CALLER_TO_CREDENTIALS.get(callerName);
 
         if (credential != null && password != null && password.equals(credential.getPassword())) {

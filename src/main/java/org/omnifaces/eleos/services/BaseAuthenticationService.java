@@ -238,7 +238,7 @@ public class BaseAuthenticationService {
             PasswordValidationCallback passwordValidation =
                 new PasswordValidationCallback(subject,
                     username,
-                    password.toCharArray());
+                    password == null? null : password.toCharArray());
 
             callbackHandler.handle(new Callback[] { passwordValidation });
 

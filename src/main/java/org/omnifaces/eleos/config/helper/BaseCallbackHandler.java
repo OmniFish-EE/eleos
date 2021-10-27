@@ -109,7 +109,7 @@ public abstract class BaseCallbackHandler implements CallbackHandler {
     protected void processPasswordValidation(PasswordValidationCallback pwdCallback) {
         // Default to a very basic in memory identity store.
         // Clients may want to override this for more advanced features.
-        Caller caller = InMemoryStore.validate(pwdCallback.getUsername(), new String(pwdCallback.getPassword()));
+        Caller caller = InMemoryStore.validate(pwdCallback.getUsername(), getPassword(pwdCallback));
         if (caller != null) {
             processCallerPrincipal(new CallerPrincipalCallback(pwdCallback.getSubject(), caller.getCallerPrincipal()));
             if (!caller.getGroups().isEmpty()) {
@@ -117,6 +117,15 @@ public abstract class BaseCallbackHandler implements CallbackHandler {
             }
             pwdCallback.setResult(true);
         }
+    }
+
+    private String getPassword(PasswordValidationCallback pwdCallback) {
+        char[] password = pwdCallback.getPassword();
+        if (password == null) {
+            return null;
+        }
+
+        return new String(password);
     }
 
     protected void processPrivateKey(PrivateKeyCallback privKeyCallback) {
