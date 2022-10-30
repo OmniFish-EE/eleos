@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
+    Copyright (c) 2022, 2022 OmniFish and/or its affiliates. All rights reserved.
     Copyright (c) 2010, 2021 Oracle and/or its affiliates. All rights reserved.
 
     This program and the accompanying materials are made available under the
@@ -21,7 +22,7 @@
 
     <groupId>org.omnifaces</groupId>
     <artifactId>eleos</artifactId>
-    <version>1.0.3-SNAPSHOT</version>
+    <version>3.0.0-SNAPSHOT</version>
 
     <name>Eleos</name>
     <description>
@@ -65,20 +66,19 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.release>11</maven.compiler.release>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
-            <version>5.0.0</version>
+            <version>6.0.0</version>
         </dependency>
         <dependency>
             <groupId>jakarta.authentication</groupId>
             <artifactId>jakarta.authentication-api</artifactId>
-            <version>2.0.0</version>
+            <version>3.0.0</version>
         </dependency>
         
         <dependency>
@@ -111,11 +111,17 @@
                     </execution>
                 </executions>
             </plugin>
+            
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+            </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.2.2</version>
                 <configuration>
                     <archive>
                         <manifestEntries>
@@ -129,7 +135,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -144,7 +150,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.4.1</version>
                 <executions>
                     <execution>
                         <id>attach-api-javadocs</id>
@@ -159,7 +165,7 @@
                             <splitindex>true</splitindex>
                             <doctitle>Eleos API documentation</doctitle>
                             <links>
-                                <link>https://jakarta.ee/specifications/platform/9.1/apidocs/</link>
+                                <link>https://jakarta.ee/specifications/platform/10/apidocs/</link>
                             </links>
                         </configuration>
                     </execution>
@@ -170,7 +176,7 @@
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.8</version>
+                <version>1.6.13</version>
                 <extensions>true</extensions>
                 <configuration>
                     <serverId>ossrh</serverId>
@@ -191,7 +197,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
+                        <version>3.0.1</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>

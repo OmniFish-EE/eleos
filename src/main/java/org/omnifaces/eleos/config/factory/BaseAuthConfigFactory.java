@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022, 2022 OmniFish and/or its affiliates. All rights reserved.
  * Copyright (c) 1997, 2018 Oracle and/or its affiliates. All rights reserved.
  *
  * This program and the accompanying materials are made available under the
@@ -34,14 +35,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
-import jakarta.security.auth.message.AuthException;
-import jakarta.security.auth.message.config.AuthConfigFactory;
-import jakarta.security.auth.message.config.AuthConfigProvider;
-import jakarta.security.auth.message.config.RegistrationListener;
-
 import org.omnifaces.eleos.config.factory.file.AuthConfigProviderEntry;
 import org.omnifaces.eleos.config.factory.file.RegStoreFileParser;
 import org.omnifaces.eleos.config.helper.OperationLock;
+
+import jakarta.security.auth.message.config.AuthConfigFactory;
+import jakarta.security.auth.message.config.AuthConfigProvider;
+import jakarta.security.auth.message.config.RegistrationListener;
+import jakarta.security.auth.message.module.ServerAuthModule;
 
 /**
  * This class implements methods in the abstract class AuthConfigFactory.
@@ -288,6 +289,18 @@ public abstract class BaseAuthConfigFactory extends AuthConfigFactory {
         if (preExistingListenersMap != null) {
             notifyListeners(preExistingListenersMap);
         }
+    }
+
+    @Override
+    public String registerServerAuthModule(ServerAuthModule serverAuthModule, Object context) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void removeServerAuthModule(Object context) {
+        // TODO Auto-generated method stub
+
     }
 
     abstract protected RegStoreFileParser getRegStore();
