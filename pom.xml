@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright (c) 2022, 2022 OmniFish and/or its affiliates. All rights reserved.
+    Copyright (c) 2022, 2023 OmniFish and/or its affiliates. All rights reserved.
     Copyright (c) 2010, 2021 Oracle and/or its affiliates. All rights reserved.
 
     This program and the accompanying materials are made available under the
@@ -22,7 +22,7 @@
 
     <groupId>org.omnifaces</groupId>
     <artifactId>eleos</artifactId>
-    <version>3.0.1-SNAPSHOT</version>
+    <version>3.0.1</version>
 
     <name>Eleos</name>
     <description>
