@@ -19,8 +19,13 @@ package org.omnifaces.eleos.config.module.config;
 import static org.omnifaces.eleos.config.helper.AuthMessagePolicy.getHttpServletPolicies;
 import static org.omnifaces.eleos.config.helper.HttpServletConstants.HTTPSERVLET;
 import static org.omnifaces.eleos.config.helper.HttpServletConstants.IS_MANDATORY;
+import static org.omnifaces.eleos.config.helper.HttpServletConstants.SOAP;
 
+import java.security.Provider;
+import java.security.Security;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import javax.security.auth.callback.CallbackHandler;
 
@@ -38,6 +43,7 @@ import jakarta.security.auth.message.config.AuthConfigProvider;
 
 public class GFAuthConfig implements AuthConfig {
 
+    protected Map<String, Object> properties;
     protected ModuleConfigurationManager moduleConfigurationManager;
     protected AuthConfigProvider authConfigProvider;
     protected String messageLayer;
@@ -51,13 +57,22 @@ public class GFAuthConfig implements AuthConfig {
 
     protected AuthConfigFactory authConfigFactory;
 
-    public GFAuthConfig(ModuleConfigurationManager moduleConfigurationManager, AuthConfigProvider authConfigProvider, String messageLayer, String appContext, CallbackHandler handler, String authModuleType) {
+    public GFAuthConfig(Map<String, Object> properties, ModuleConfigurationManager moduleConfigurationManager, AuthConfigProvider authConfigProvider, String messageLayer, String appContext, CallbackHandler handler, String authModuleType) {
+        this.properties = properties;
         this.moduleConfigurationManager = moduleConfigurationManager;
         this.authConfigProvider = authConfigProvider;
         this.messageLayer = messageLayer;
         this.appContext = appContext;
         this.handler = handler != null ? handler : AuthMessagePolicy.getDefaultCallbackHandler();
         this.authModuleType = authModuleType;
+
+        if (this.properties == null) {
+            Provider provider = Security.getProvider("EleosProvider");
+            if (provider != null) {
+                this.properties = new HashMap<>();
+                this.properties.put("authContextIdGenerator", provider.get("authContextIdGenerator"));
+            }
+        }
     }
 
     @Override
@@ -87,14 +102,19 @@ public class GFAuthConfig implements AuthConfig {
      */
     @Override
     public String getAuthContextID(MessageInfo messageInfo) {
+        if (properties.containsKey("authContextIdGenerator")) {
+            @SuppressWarnings("unchecked")
+            Function<MessageInfo, String> authContextIdGenerator = (Function<MessageInfo, String>) properties.get("authContextIdGenerator");
+
+            return authContextIdGenerator.apply(messageInfo);
+        }
+
         if (HTTPSERVLET.equals(messageLayer)) {
             return Boolean.valueOf((String) messageInfo.getMap().get(IS_MANDATORY)).toString();
         }
 
         return null;
     }
-
-    // we should be able to replace the following with a method on packet
 
     /**
      * Causes a dynamic authentication context configuration object to update the internal state that it uses to process
@@ -134,8 +154,9 @@ public class GFAuthConfig implements AuthConfig {
 
     private void initialize(Map<String, ?> properties) {
         if (!init) {
+            authModuleId = (String) properties.get("authModuleId");
+
             if (HTTPSERVLET.equals(messageLayer)) {
-                authModuleId = (String) properties.get("authModuleId");
                 onePolicy = true;
             }
 
