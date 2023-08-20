@@ -25,6 +25,7 @@ import java.security.Provider;
 import java.security.Security;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import javax.security.auth.callback.CallbackHandler;
@@ -54,6 +55,7 @@ public class GFAuthConfig implements AuthConfig {
     protected String authModuleId;
     protected boolean init;
     protected boolean onePolicy;
+    protected MessagePolicy[] soapPolicies;
 
     protected AuthConfigFactory authConfigFactory;
 
@@ -71,6 +73,7 @@ public class GFAuthConfig implements AuthConfig {
             if (provider != null) {
                 this.properties = new HashMap<>();
                 this.properties.put("authContextIdGenerator", provider.get("authContextIdGenerator"));
+                this.properties.put("soapPolicyGenerator", provider.get("soapPolicyGenerator"));
             }
         }
     }
@@ -138,11 +141,10 @@ public class GFAuthConfig implements AuthConfig {
 
     protected AuthModuleInstanceHolder getAuthModuleInstanceHolder(String authContextID, Map<String, Object> properties) throws AuthException {
         if (!init) {
-            initialize(properties);
+            initialize(authContextID, properties);
         }
 
-        // For now only HTTP supported. Add support for other layers in the future.
-        MessagePolicy[] policies = getHttpServletPolicies(authContextID);
+        MessagePolicy[] policies = HTTPSERVLET.equals(messageLayer)? getHttpServletPolicies(authContextID) : soapPolicies;
 
         AuthModuleBaseConfig authModuleConfig = moduleConfigurationManager.getAuthModuleConfig(messageLayer, authModuleId, policies[0], policies[1], authModuleType);
         if (authModuleConfig == null) {
@@ -152,12 +154,20 @@ public class GFAuthConfig implements AuthConfig {
         return moduleConfigurationManager.createAuthModuleInstance(authModuleConfig, handler, authModuleType, properties);
     }
 
-    private void initialize(Map<String, ?> properties) {
+    private void initialize(String authContextID, Map<String, Object> properties) {
         if (!init) {
             authModuleId = (String) properties.get("authModuleId");
 
             if (HTTPSERVLET.equals(messageLayer)) {
                 onePolicy = true;
+            } else {
+                if (this.properties.containsKey("soapPolicyGenerator")) {
+                    @SuppressWarnings("unchecked")
+                    BiFunction<String, Map<String, Object>, MessagePolicy[]> soapPolicyGenerator =
+                        (BiFunction<String, Map<String, Object>, MessagePolicy[]>) this.properties.get("soapPolicyGenerator");
+
+                    soapPolicies = soapPolicyGenerator.apply(authContextID, properties);
+                }
             }
 
             // HandlerContext need to be explicitly set by caller
