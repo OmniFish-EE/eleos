@@ -116,7 +116,12 @@ public abstract class BaseCallbackHandler implements CallbackHandler {
             principal = new CallerPrincipal(callerPrincipalCallback.getName());
         }
 
-        Caller.toSubject(subject, new Caller(principal));
+        Caller caller = Caller.fromSubject(subject);
+        if (caller == null) {
+            Caller.toSubject(subject, new Caller(principal));
+        } else {
+            caller.setCallerPrincipal(principal);
+        }
     }
 
     private void processGroupPrincipal(GroupPrincipalCallback groupCallback) {
