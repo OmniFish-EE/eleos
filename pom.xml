@@ -22,7 +22,7 @@
 
     <groupId>org.omnifaces</groupId>
     <artifactId>eleos</artifactId>
-    <version>3.0.4-SNAPSHOT</version>
+    <version>3.0.4</version>
 
     <name>Eleos</name>
     <description>
